@@ -1,0 +1,248 @@
+:root {
+    --box-shadow_input_color: rgba(84, 106, 123, 0.24);
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+
+    color: #0D1F2D;
+    /* background: #00A8E8; */
+    background: rgb(172, 222, 255);
+
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    position: relative;
+}
+
+*, *::before, *::after {
+    box-sizing: border-box;
+}
+
+.logo {
+    text-decoration: none;
+    font-weight: 700;
+    writing-mode: vertical-rl;
+
+    color: black;
+
+}
+
+nav {
+    padding: 2rem 2.35rem;
+    position: absolute;
+    
+    width: 100%;
+}
+
+.login input[type=submit], .login input[type=button] {
+    border-radius: 99999px;
+    border: 2px solid transparent;
+    outline: none;
+    padding: .75rem 2rem;
+    font-weight: 700;
+}
+
+.login div:last-child {
+    margin-top: 100px;
+}
+
+.login input[type=submit] {
+    background: #00A8E8;
+    color: white;
+}
+
+.login input[type=button] {
+    border: 2px solid #00A8E8;
+    background: none;
+    color: #00A8E8;
+}
+
+.login_wrapper {
+    background: white;
+    height: 100vh;
+    
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    
+    padding-top: 250px;
+}
+
+.login_wrapper form {
+    display: flex;
+    flex-direction: column;
+}
+
+.login_wrapper form svg {
+    fill: slategray;
+    height: 20px;
+}
+
+input[type=text], input[type="password"] {
+    border-radius: 3px;
+    border: none;
+    outline: none;
+    width: 100%;
+
+    padding: .85rem;
+}
+
+.input {
+    background: white;
+    padding: 2px;
+
+    border-radius: 3px;
+
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+
+    position: relative;
+}
+
+.input svg {
+    position: absolute;
+    padding-left: .75em;
+}
+
+.input input {
+    box-shadow: 0 .1rem .4rem var(--box-shadow_input_color);
+
+    box-shadow: 0px .1rem .4rem var(--box-shadow_input_color);
+    transition: ease-out 200ms box-shadow;
+    border-width: 1px;
+    border-color: transparent;
+    border-style: solid;
+
+    padding-left: 2.5rem;
+}
+
+.input input:focus {
+    box-shadow: 0px .3rem .6rem var(--box-shadow_input_color);
+    transition: ease-out 200ms box-shadow;
+    border-color: rgba(76, 77, 119, 0.356);
+}
+
+
+.login_wrapper header {
+    width: 100%;
+}
+
+.splash_grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr;
+}
+
+main {
+    background: white;
+    min-height: 100vh;
+
+    margin-left: 100px;
+    box-sizing: border-box;
+
+    padding: 2rem;
+}
+
+.nav_wrapper {
+    position: fixed;
+    width: 50px;
+    height: 100vh;
+    padding: 2rem 3rem;
+}
+
+.nav_wrapper nav {
+    padding: 0;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    height: 100%;
+}
+
+.nav_wrapper ul {
+    display: flex;
+    list-style: none;
+    padding: 0;
+    height: 100%;
+}
+
+.nav_wrapper ul li {
+    margin: 0;
+}
+
+.nav_wrapper ul li:last-child{
+    align-self: flex-end;
+}
+
+.round {
+    border-radius: 50%;
+    overflow: hidden;
+    height: 3rem;
+    width: 3rem;
+}
+
+.round img {
+    display: block;
+    width: 100%;
+}
+
+
+@media only screen and (min-width: 768px) {
+    /* Login no stretch */
+}
+
+@media only screen and (min-width: 1024px) {
+    .splash_grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .advert {
+        margin: 250px 100px;
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .advert h3 {
+        color: rgba(83, 110, 141, 0.534);
+        font-weight: 400;
+    }
+
+    .advert h1 {
+        color: rgb(52, 76, 85);
+    }
+
+    .login_wrapper {
+        grid-column: 2;
+        grid-row: 1;
+    }
+}
+
+@media only screen and (min-width: 1280px) {
+
+}
+
+.heatmap_wrapper {
+    width: 100%;
+    padding: 25vh 0;
+    background: rgb(221, 221, 221);
+    border-radius: 3px;
+}
+
+.error {
+    color: gray;
+    text-align: center;
+    height: 100%;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.error h1, h3 {
+    font-weight: 300;
+}

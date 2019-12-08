@@ -1,0 +1,24 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Database Handler",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}\\database\\database_handler.py",
+            "cwd": "${workspaceFolder}\\database",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Server",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}\\client_app\\server.py",
+            "cwd": "${workspaceFolder}\\client_app",
+            "console": "integratedTerminal"
+        }
+    ]
+}
