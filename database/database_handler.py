@@ -19,21 +19,27 @@ class FetchThread():
 
             # Listen forever
             while True:
-
                 client_connection, client_address = s.accept()
                 with client_connection:
                     print(f"New connection by {client_address}")
-                    while True:
+                    while True: # FIXME Right now we just read 4kb of data. We should change this so the client specifies the data length.
                         data = client_connection.recv(32768) # Max. 4Kbites of data
                         if not data:
                             break
 
                         decoded = data.decode("utf-8")
                         received = json.loads(decoded)
-                        if(self.database.handle(received) > 0):
+
+                        result = self.database.handle(received)
+                        if(result[0]):
                             print(f"Sucessfully handled the following input: {decoded}")
+                            if (result[1]):
+                                client_connection.sendall(bytes(str(result[2]), "utf-8"))
+                                print(f"Responding with: {result[2]}")
                         else:
                             print(f"Something failed while handeling the input: {decoded}")
+                            client_connection.close()
+                            break
 
 
 class Database():
@@ -63,33 +69,45 @@ class Database():
     def setupDatabase(self):
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS users(
-                ID Int AUTO_INCREMENT,
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
 
                 email TEXT NOT NULL,
                 password TEXT NOT NULL,
-                salt TEXT NOT NULL,
-
-                PRIMARY KEY (ID)
+                salt TEXT NOT NULL
             )
         ''')
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS data(
-                ID INT AUTO_INCREMENT,
+                ID INTEGER PRIMARY KEY AUTOINCREMENT
+                deviceId INTEGER,
 
-                PRIMARY KEY (ID)
+
+
+                FOREIGN KEY (device_id) REFERENCES device(ID)
+            )
+        ''')
+        # TODO: Add data column
+        self.executeSql('''
+            CREATE TABLE IF NOT EXISTS devices(
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                ownerId Integer NOT NULL,
+                name TEXT,
+
+                FOREIGN KEY (ownerId) REFERENCES users(ID)
             )
         ''')
         self.executeSql('''
-            CREATE TABLE IF NOT EXISTS pax_count(
-                ID INT AUTO_INCREMENT,
-                userID INT NOT NULL REFERENCES users(ID),
+            CREATE TABLE IF NOT EXISTS pax_counts(
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                userId INTEGER NOT NULL,
+                deviceId INTEGER NOT NULL
 
                 time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                dataID INT NOT NULL,
+                dataId INTEGER NOT NULL,
 
-                PRIMARY KEY (ID),
-                FOREIGN KEY (userId) REFERENCES users(id),
-                FOREIGN KEY (dataID) REFERENCES data(id)
+                FOREIGN KEY (userId) REFERENCES users(ID),
+                FOREIGN KEY (dataId) REFERENCES data(ID)
+                FOREIGN KEY (deviceId) REFERENCES device(ID)
             )
         ''')
 
@@ -103,8 +121,7 @@ class Database():
         print (f"Found {rowcount} entries with the specified email.")
         if (rowcount > 0):
             return -1 # If the email is already registered, let this fail
-        # FIXME: This already doesn't work
-        
+
         cur = self.connection.cursor()
         cur.execute('''
             INSERT INTO users(email,password,salt)
@@ -116,12 +133,64 @@ class Database():
         self.connection.commit()
         return rowcount == 1
 
+    def salt(self, email):
+        cur = self.connection.cursor()
+        data = cur.execute('''
+            SELECT salt FROM users WHERE email = (?)
+        ''', [email]).fetchone()
+        
+        if (len(data) == 0):
+            return False, False, None
+
+        cur.close()
+        return True, True, data[0]
+
+    def login(self, email, password):
+        cur = self.connection.cursor()
+        data = cur.execute('''
+            SELECT ID FROM users WHERE email = (?) AND password = (?)
+        ''', [email, password]).fetchone()
+
+        cur.close()
+        if (type(data[0]) is not int):
+            return False, False, None
+        return True, True, data[0]
+
+    def add_device(self, user_id, device_name):
+        cur = self.connection.cursor()
+        device = cur.execute('''
+            INSERT INTO devices(ownerId,name)
+            VALUES (?,?)
+        ''', [user_id, device_name]).fetchone()
+
+        cur.close()
+        return True, True, device[0]
+
+    # FIXME: Test this
+    def add_data(self, user_id, device_id, data = None): # Ommiting data 
+        cur = self.connection.cursor()
+
+        # TODO Actually add data.
+        data = cur.execute('''
+            INSERT INTO data(deviceId)
+        ''', [device_id]).fetchone()
+
+        cur.execute('''
+            INSERT INTO pax_counts(userId,deviceId,dataId)
+            VALUES (?,?,?)
+        ''', [user_id, device_id, data[0]])
+
+    # Handle returns output in the following format:
+    #  - Sucessfully handled Request: True / False
+    #  - Has data to return to the client: True / False
+    #  - Data that should be returned: obj
     def handle(self, input:dict):
         if (input["type"] == "REGISTER"):
             return self.create_new_user(input["email"], input["password"], input["salt"])
+        elif (input["type"] == "GET_SALT"):
+            return self.salt(input["email"])
         elif (input["type"] == "LOGIN"):
-            # return self.login() TODO: Fix login
-            pass
+            return self.login(input["email"], input["password"])
         return -9999
 
 
