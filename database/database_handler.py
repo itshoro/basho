@@ -43,26 +43,43 @@ class Database():
         print("Connected successfully to the database.")
         self.setupDatabase()
 
+    def create_connection(self, db_file):
+        try:
+            self.connection = sqlite3.connect(db_file)
+            print("Successfully connected to the database. ", sqlite3.version)
+        except sqlite3.Error as e:
+            print(e)
+        finally:
+            if self.connection:
+                self.connection.close()
+
+    def executeSql(self, createTableSql):
+        try:
+            cur = self.connection.cursor()
+            cur.execute(createTableSql)
+        except sqlite3.Error as e:
+            print(e)
+
     def setupDatabase(self):
-        self.connection.execute('''
+        self.executeSql('''
             CREATE TABLE IF NOT EXISTS users(
                 ID Int AUTO_INCREMENT,
 
                 email TEXT NOT NULL,
-                passwordHash TEXT NOT NULL,
-                passwordSalt TEXT NOT NULL,
+                password TEXT NOT NULL,
+                salt TEXT NOT NULL,
 
                 PRIMARY KEY (ID)
             )
         ''')
-        self.connection.execute('''
+        self.executeSql('''
             CREATE TABLE IF NOT EXISTS data(
                 ID INT AUTO_INCREMENT,
 
                 PRIMARY KEY (ID)
             )
         ''')
-        self.connection.execute('''
+        self.executeSql('''
             CREATE TABLE IF NOT EXISTS pax_count(
                 ID INT AUTO_INCREMENT,
                 userID INT NOT NULL REFERENCES users(ID),
@@ -76,22 +93,32 @@ class Database():
             )
         ''')
 
-    def newUser(self, email, password, salt):
-        cursor = self.connection.cursor()
-        if(cursor.execute('''
-            SELECT * FROM users WHERE email = (?)
-        ''', [email]).rowcount > 0):
-            return -1 # If the email is already registered, let this fail
-        
-        rows = cursor.execute('''
-            INSERT INTO users(ID,email,passwordHash,passwordSalt) VALUES (NULL,?,?,?)
-        ''', [email, password, salt]).fetchall()
+    def create_new_user(self, email, password, salt):
+        cur = self.connection.cursor()
 
-        return len(rows) == 1
+        rowcount = len(cur.execute('''
+            SELECT * FROM users WHERE email = (?)
+        ''', [email]).fetchall()) # cur.rowcount returns -1 after a SELECT, because the API does not specify a way to receive the number of rows
+        print (f"Searching if user with email \"{email}\" already exists.")
+        print (f"Found {rowcount} entries with the specified email.")
+        if (rowcount > 0):
+            return -1 # If the email is already registered, let this fail
+        # FIXME: This already doesn't work
+        
+        cur = self.connection.cursor()
+        cur.execute('''
+            INSERT INTO users(email,password,salt)
+            VALUES (?,?,?)
+        ''', (email, password, salt))
+
+        rowcount = cur.rowcount
+        cur.close()
+        self.connection.commit()
+        return rowcount == 1
 
     def handle(self, input:dict):
         if (input["type"] == "REGISTER"):
-            return self.newUser(input["email"], input["password"], input["salt"])
+            return self.create_new_user(input["email"], input["password"], input["salt"])
         elif (input["type"] == "LOGIN"):
             # return self.login() TODO: Fix login
             pass
