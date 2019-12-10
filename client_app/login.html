@@ -15,8 +15,8 @@
     </nav>
     <div class="splash_grid">
         <div class="login_wrapper">
-            <h1>Login</h1>
             <form class="login" action="POST">
+                <h1>Login</h1>
                 <div class="input">
                     <svg x="0px" y="0px" viewBox="0 0 483.3 483.3" xml:space="preserve">
                         <g>
@@ -62,7 +62,17 @@
                 </div>
                 <div>
                     <input type="button" onclick="login()" value="Login">
+                    <input type="button" class="link" onclick="toggleRegisterForm()" value="I don't have an account">
+                </div>
+            </form>
+            <form class="login hide">
+                <h1>Register</h1>
+                <div class="input"><input type="text" placeholder="E-Mail" name="email"></div>
+                <div class="input"><input type="password" placeholder="Password" name="password"></div>
+                <div class="input"><input type="password" placeholder="Repeat Password" name="passwordSafety"></div>
+                <div>
                     <input type="button" onclick="register()" value="Register">
+                    <input type="button" class="link" onclick="toggleRegisterForm()" value="I already have an account">
                 </div>
             </form>
         </div>

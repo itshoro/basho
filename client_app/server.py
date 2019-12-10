@@ -2,6 +2,8 @@ import cherrypy
 import hashlib
 import secrets
 
+import sys
+
 import socket
 
 
@@ -10,6 +12,10 @@ class LoginHandler:
         self._TYPE_REGISTER_USER = "REGISTER"
         self._TYPE_LOGIN_USER = "LOGIN"
         self._TYPE_GET_SALT = "GET_SALT"
+
+    @cherrypy.expose
+    def index(self):
+        return open("login.html")
 
     @cherrypy.expose
     def register(self, email, password):
@@ -21,6 +27,14 @@ class LoginHandler:
         passHash.update(salt.encode("utf-8"))
 
         self.tryRegisterUser(email, passHash.hexdigest(), salt)
+        data = self.dbSocket.recv(1024)
+
+        id = -1
+        if data:
+            id = data.decode("utf-8")
+
+        if id == -1:
+            raise cherrypy.HTTPError(400, "A user with that e-mail already exists.")
         self.dbSocket.close()
 
     @cherrypy.expose
@@ -51,7 +65,14 @@ class LoginHandler:
             '''
             self.dbSocket.sendall(bytes(json, "utf-8"))
             data = self.dbSocket.recv(1024)
-            print(data)
+            
+            userId = -1
+            if data:
+                userId = data.decode("utf-8")
+
+            if userId == -1:
+                raise cherrypy.HTTPError(400, "Login is invalid.")
+
             self.dbSocket.close()
         else:
             self.dbSocket.close()
@@ -69,6 +90,21 @@ class LoginHandler:
         '''.replace(" ", "")
         self.dbSocket.sendall(bytes(json, "utf-8")) # TODO: Handle response
 
-handler = LoginHandler()
-# handler.register("user@email.com", "password123")
-handler.login("user@email.com", "password123")
+
+
+cherrypy.engine.autoreload.unsubscribe()
+# Static content config
+static_config = {
+    '/': {
+        'tools.staticdir.root': sys.path[0],
+        'tools.staticdir.on': True,
+        'tools.staticdir.dir': './content'
+    }
+}
+
+cherrypy.tree.mount(LoginHandler(), '/', static_config)
+# suppress traceback-info
+cherrypy.config.update({'request.show_tracebacks': False})
+# Start server
+cherrypy.engine.start()
+cherrypy.engine.block()

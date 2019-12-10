@@ -120,18 +120,18 @@ class Database():
         print (f"Searching if user with email \"{email}\" already exists.")
         print (f"Found {rowcount} entries with the specified email.")
         if (rowcount > 0):
-            return -1 # If the email is already registered, let this fail
+            return False, False, None # If the email is already registered, let this fail
 
-        cur = self.connection.cursor()
         cur.execute('''
             INSERT INTO users(email,password,salt)
             VALUES (?,?,?)
         ''', (email, password, salt))
 
         rowcount = cur.rowcount
+        id = cur.lastrowid
         cur.close()
         self.connection.commit()
-        return rowcount == 1
+        return rowcount == 1, True, id
 
     def salt(self, email):
         cur = self.connection.cursor()
@@ -139,7 +139,7 @@ class Database():
             SELECT salt FROM users WHERE email = (?)
         ''', [email]).fetchone()
         
-        if (len(data) == 0):
+        if (data == None or len(data) == 0):
             return False, False, None
 
         cur.close()
@@ -152,7 +152,7 @@ class Database():
         ''', [email, password]).fetchone()
 
         cur.close()
-        if (type(data[0]) is not int):
+        if (data == None):
             return False, False, None
         return True, True, data[0]
 
@@ -180,6 +180,20 @@ class Database():
             VALUES (?,?,?)
         ''', [user_id, device_id, data[0]])
 
+    def send_http_response_and_close_connection(self, client_socket: socket.socket, response_body: str, response_status = 200, response_status_text = "OK"):
+        response_headers = {
+            'Content-Type': 'text/html; encoding=utf8',
+            'Content-Length': len(response_body),
+            'Connection': 'close',
+        }
+
+        response_proto = "HTTP/1.1"
+        client_socket.send(f"{response_proto} {response_status} {response_status_text}")
+        client_socket.send("".join(f"{key}: {value}\n" for key, value in response_headers.items()))
+        client_socket.send(response_body)
+
+        client_socket.close()
+
     # Handle returns output in the following format:
     #  - Sucessfully handled Request: True / False
     #  - Has data to return to the client: True / False
@@ -191,7 +205,7 @@ class Database():
             return self.salt(input["email"])
         elif (input["type"] == "LOGIN"):
             return self.login(input["email"], input["password"])
-        return -9999
+        return False, False, None
 
 
 # db = Database("Main")
