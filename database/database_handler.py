@@ -1,8 +1,11 @@
 import sqlite3
 import threading
 import socket
+import secrets
 
 import json
+
+import datetime
 
 # class FetchThread(threading.Thread):
 class FetchThread():
@@ -73,7 +76,10 @@ class Database():
 
                 email TEXT NOT NULL,
                 password TEXT NOT NULL,
-                salt TEXT NOT NULL
+                salt TEXT NOT NULL,
+
+                sessionToken TEXT,
+                sessionExpiry DATETIME
             )
         ''')
         self.executeSql('''
@@ -153,8 +159,35 @@ class Database():
 
         cur.close()
         if (data == None):
+            # No user with the email and password combo is found => invalid data.
             return False, False, None
-        return True, True, data[0]
+
+        # User credentials were correct, create a new session.
+        # Sessions are valid for 7 days.
+        cur = self.connection.cursor()
+        token = self.generateSessionToken()
+        cur.execute('''
+            UPDATE users
+            SET sessionToken = (?), sessionExpiry = (?)
+            WHERE ID = (?)
+        ''',
+        [
+            token,
+            datetime.datetime.now() + datetime.timedelta(days=7),
+            data[0]
+        ])
+        cur.close()
+        self.connection.commit() # FIXME: The update doesn't get called.
+
+        response = {
+            "user_id": data[0],
+            "sessionToken": token
+        }
+        return True, True, response
+
+    def generateSessionToken(self):
+        return secrets.token_hex(8) # 16 character random string, ref: https://stackoverflow.com/a/50842164
+
 
     def add_device(self, user_id, device_name):
         cur = self.connection.cursor()
@@ -164,6 +197,7 @@ class Database():
         ''', [user_id, device_name]).fetchone()
 
         cur.close()
+        self.connection.commit()
         return True, True, device[0]
 
     # FIXME: Test this
@@ -194,17 +228,58 @@ class Database():
 
         client_socket.close()
 
+    def try_validate_session(self, user_id, session_token):
+        cur = self.connection.cursor()
+        
+        result = cur.execute('''
+            SELECT sessionExpiry from users WHERE ID = (?) AND sessionToken = (?)
+        ''', [user_id, session_token]).fetchone()
+
+        if result:
+            expiryTime = datetime.datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
+            if expiryTime < datetime.datetime.now():
+                self.clearSession(user_id)
+                return False, False, None
+            
+            cur.execute('''
+                UPDATE users
+                SET sessionExpiry = (?)
+                WHERE ID = (?)
+            ''', [datetime.datetime.now() + datetime.timedelta(days=7), user_id])
+            cur.close()
+            self.connection.commit()
+            return True, True, session_token
+
+        self.clearSession(user_id)
+        return False, False, None
+
+    def clearSession(self, user_id):
+        cur = self.connection.cursor()
+        cur.execute('''
+            UPDATE users 
+            SET sessionToken = NULL AND sessionExpiry = NULL
+            WHERE ID = (?)
+        ''', [user_id])
+        cur.close()
+        self.connection.commit()
+
     # Handle returns output in the following format:
     #  - Sucessfully handled Request: True / False
     #  - Has data to return to the client: True / False
     #  - Data that should be returned: obj
     def handle(self, input:dict):
+        # TODO Currently a user could send requests without the right body.
+        # Sanitize the input dict, and check if it has the necessary keys.
+
         if (input["type"] == "REGISTER"):
             return self.create_new_user(input["email"], input["password"], input["salt"])
         elif (input["type"] == "GET_SALT"):
             return self.salt(input["email"])
         elif (input["type"] == "LOGIN"):
             return self.login(input["email"], input["password"])
+        elif (input["type"] == "VALIDATE_SESSION"):
+            return self.try_validate_session(input["user_id"], input["token"])
+
         return False, False, None
 
 

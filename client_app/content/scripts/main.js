@@ -12,18 +12,31 @@ function login() {
 
     let email = loginForm["email"].value;
     let password = loginForm["password"].value;
+
+    createPostHttpRequest("/login", `email=${email}&password=${password}`,
+        () => {
+            alert("You successfully logged in.");
+        }, 
+        (obj) => {
+            createError(obj.responseText);
+    });
+}
+
+function createPostHttpRequest(url, urlEncodedParameters, onSuccessCallback, onErrorCallback) {
     let request = new XMLHttpRequest();
-    request.open("POST", "/login", true);
+    request.open("POST", url, true);
     request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+
     request.onreadystatechange = function() {
         if (request.readyState == 4 && request.status == 200) {
-            alert("I think you just logged in.")
+            onSuccessCallback();
         }
-        else if (request.readyState == 4 && request.status >= 400) {
-            createError("Your username or password is wrong.");
+        else if (request.readyState >= 3 && request.status >= 400) {
+            onErrorCallback(request);
         }
     }
-    request.send(`email=${email}&password=${password}`);
+
+    request.send(urlEncodedParameters);
 }
 
 function register() {
@@ -37,18 +50,13 @@ function register() {
         return;
     }
 
-    let request = new XMLHttpRequest();
-    request.open("POST", "/register", true);
-    request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-    request.onreadystatechange = function() {
-        if (request.readyState == 4 && request.status == 200) {
-            window.location.reload();
-        }
-        else if (request.readyState == 4 && request.status >= 400) {
-            createError("A user with that name already exists.");
-        }
-    }
-    request.send(`email=${email}&password=${password}`);
+    createPostHttpRequest("/register", `email=${email}&password=${password}`,
+    () => {
+        window.location.reload();
+    }, 
+    (obj) => {
+        createError(obj.responseText);
+    });
 }
 
 
