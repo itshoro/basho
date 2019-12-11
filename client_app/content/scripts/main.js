@@ -15,7 +15,7 @@ function login() {
 
     createPostHttpRequest("/login", `email=${email}&password=${password}`,
         () => {
-            alert("You successfully logged in.");
+            window.location.reload();
         }, 
         (obj) => {
             createError(obj.responseText);
