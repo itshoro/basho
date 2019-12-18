@@ -85,35 +85,43 @@ class Database():
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS data(
                 ID INTEGER PRIMARY KEY AUTOINCREMENT
-                deviceId INTEGER,
+                deviceId INTEGER NOT NULL,
 
-
+                density INTEGER NOT NULL,
 
                 FOREIGN KEY (device_id) REFERENCES device(ID)
             )
         ''')
-        # TODO: Add data column
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS devices(
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 ownerId Integer NOT NULL,
                 name TEXT,
+                
+                X_coordinate INTEGER NOT NULL,
+                Y_coordinate INTEGER NOT NULL,
 
                 FOREIGN KEY (ownerId) REFERENCES users(ID)
             )
         ''')
         self.executeSql('''
-            CREATE TABLE IF NOT EXISTS pax_counts(
+            CREATE TABLE IF NOT EXISTS map(
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                userId INTEGER NOT NULL,
-                deviceId INTEGER NOT NULL
+                title NAME NOT NULL,
+                mapImage BLOB
+            )
+        ''')
+        self.executeSql('''
+            CREATE TABLE IF NOT EXISTS map_data(
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataId INTEGER NOT NULL,
+                mapId INTEGER NOT NULL,
 
                 time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                dataId INTEGER NOT NULL,
 
-                FOREIGN KEY (userId) REFERENCES users(ID),
-                FOREIGN KEY (dataId) REFERENCES data(ID)
-                FOREIGN KEY (deviceId) REFERENCES device(ID)
+                FOREIGN KEY (dataId) REFERENCES data(ID),
+                FOREIGN KEY (deviceId) REFERENCES device(ID),
+                FOREIGN KEY (mapId) REFERENCES map(ID)
             )
         ''')
 
@@ -177,7 +185,7 @@ class Database():
             data[0]
         ])
         cur.close()
-        self.connection.commit() # FIXME: The update doesn't get called.
+        self.connection.commit()
 
         response = {
             "user_id": data[0],
