@@ -19,6 +19,10 @@ function login() {
             window.location.reload();
         }, 
         (obj) => {
+            if (obj.status === 500) {
+                createError("It seems, that we can't reach our authentication servers.\nPlease try again later.");
+                return;
+            }
             createError(obj.responseText);
     });
 }
@@ -47,6 +51,10 @@ function register() {
     let password = registerForm["password"].value;
 
     if (password !== registerForm["passwordSafety"].value) {
+        if (obj.status === 500) {
+            createError("It seems, that we can't reach our authentication servers.\nPlease try again later.");
+            return;
+        }
         createError("Passwords don't match!");
         return;
     }
@@ -56,6 +64,10 @@ function register() {
         window.location.reload();
     }, 
     (obj) => {
+        if (obj.status === 500) {
+            createError("It seems, that we can't reach our authentication servers.\nPlease try again later.");
+            return;
+        }
         createError(obj.responseText);
     });
 }
