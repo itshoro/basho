@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+
+    <script src="scripts/main.js"></script>
+    <link rel="stylesheet" href="style/style.css">
+    % if error != None:
+    <script>
+        createError("$error");
+    </script>
+    % endif
+</head>
+<body>
+    <nav>
+        <a href="/" class="logo">BASHO</a>
+    </nav>
+    <div class="splash_grid">
+        <div class="login_wrapper">
+            ${form}
+        </div>
+
+        <div class="advert">
+            <h1>Track your workplace. Find Hotspots.</h1>
+            <h3>Monitor movement to improve flow, stop congestion before it even happens.</h3>
+        </div>
+    </div>
+</body>
+</html>

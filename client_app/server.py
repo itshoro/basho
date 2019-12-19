@@ -3,9 +3,12 @@ import hashlib
 import secrets
 
 import sys
+import os
 
 import socket
 import json
+
+import template
 
 # Because we send the error messages as plain text instead of a full blown error page.
 class CustomHTTPError(cherrypy.HTTPError):
@@ -20,6 +23,10 @@ class CustomHTTPError(cherrypy.HTTPError):
 
 class LoginHandler:
     def __init__(self):
+        self.view = template.TemplateHandler(os.path.join(sys.path[0], "templates"))
+        self.formState = 0 # 0 = Login, 1 = Register
+        self.forms = ["login", "register"]
+
         self._TYPE_REGISTER_USER = "REGISTER"
         self._TYPE_LOGIN_USER = "LOGIN"
         self._TYPE_GET_SALT = "GET_SALT"
@@ -32,11 +39,10 @@ class LoginHandler:
 
     @cherrypy.expose
     def index(self):
-        # Check for a session cookie.
         if (len(cherrypy.request.cookie) == 2 and cherrypy.request.cookie["sessionToken"]):
             return self.tryValidateAndRecoverSession()
         else:
-            return open("login.html")
+            return self.view.create_view("login", { "form": "login", "error": None })
 
     @cherrypy.expose
     def register(self, email, password):
@@ -110,8 +116,15 @@ class LoginHandler:
         else:
             self.dbSocket.close()
             self.clearCookies()
-            # TODO: Open Login page and somehow trigger the js for an error
+            # TODO: Create Templating Engine, that can take an error as an optional parameter. Redirect to login here, I already adjusted the login.html to be able to display an error, when passed as the parameter "error"
             raise CustomHTTPError(403, self._ERROR_SESSION_EXPIRED)
+
+    @cherrypy.expose
+    def toggleForm(self, formState):
+        formState = int(formState)
+        form = self.forms[formState % 2]
+        markup = self.view.create_form(form)
+        return markup
 
     def tryLoginAndStartSession(self, email, password):
         jsonRequest = f'''

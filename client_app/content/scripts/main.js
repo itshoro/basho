@@ -1,5 +1,6 @@
 window.addEventListener("load", function() {
     const registerForm = this.document.querySelectorAll("form")[1];
+    formParent = document.getElementsByClassName("login_wrapper")[0];
 });
 
 function toggleRegisterForm() {
@@ -29,7 +30,7 @@ function createPostHttpRequest(url, urlEncodedParameters, onSuccessCallback, onE
 
     request.onreadystatechange = function() {
         if (request.readyState == 4 && request.status == 200) {
-            onSuccessCallback();
+            onSuccessCallback(request);
         }
         else if (request.readyState >= 3 && request.status >= 400) {
             onErrorCallback(request);
@@ -90,4 +91,18 @@ function createError(msg) {
 function removeError(){
     error.remove();
     showsError = false;
+}
+
+let formParent;
+let formState = 0;
+function toggleForm() {
+    for (child of formParent.children) {
+        child.remove()
+    }
+    formState = (formState + 1) % 2;
+    createPostHttpRequest("/toggleForm", `formState=${formState}`, (obj) => {
+        formParent.insertAdjacentHTML("afterbegin", obj.responseText);
+    }, (obj) => {
+        console.log(obj.responseText);
+    })
 }

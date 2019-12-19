@@ -9,33 +9,32 @@ class TemplateHandler:
         self.lookup = TemplateLookup(template_dir, module_directory=template_dir)
         self.templateMethods = {
             "login": [
-                self.create_login_form(),
-                "login_form.html"
-            ],
-            "register": [
-                self.create_register_form(),
-                "register_form.html"
+                self._create_login_site,
+                "login.html"
             ],
             "index": [
                 "index.html"
             ]
         }
 
-    def create_login_form(self, context, data, userId):
-        pass
+    def create_form(self, form_name):
+        return self.lookup.get_template(f"form_{form_name}.html").render()
 
-    def create_form(self, context):
+    def _create_login_site(self, templateName, data, userId = None):
         try:
-            template = self.lookup.get_template("login.html")
-            
+            template = self.lookup.get_template(templateName)
+            formMarkup = self.create_form(data["form"])
 
-    def create_register_form(self, context, data, userId):
-        pass
+            markup = template.render(form = formMarkup, error = data["error"])
+        except:
+            print(exceptions.text_error_template().render())
+            markup = exceptions.html_error_template().render()
+        return markup
 
     def create_view(self, type, data, userId = None):
         markup = ""
         if type in self.templateMethods:
-            context = self.templateMethods[type][1]
-            markup += self.templateMethods[type][0](context, data, userId) # Call create method.
-
+            templateName = self.templateMethods[type][1]
+            method = self.templateMethods[type][0] # Call create method.
+            markup += method(templateName, data, userId)
         return markup
