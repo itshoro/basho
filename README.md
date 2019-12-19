@@ -7,11 +7,9 @@ BASHO is a mockup of a pax-counting application, served as a distributed system,
 To run BASHO on a single system it is required to run it in a virtual environment for the moment (or install the util package globally).
 
 ```shell
-# Setup virtual environment
-python -m venv ENV_NAME
-./ENV_NAME/Scripts/activate
+python -m venv venv
+./venv/Scripts/activate
 
-# Install dependencies
 pip install -r requirements.txt
 pip install -e .
 ```

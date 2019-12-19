@@ -3,6 +3,9 @@
 # Created by https://www.gitignore.io/api/windows,visualstudiocode,python,database
 # Edit at https://www.gitignore.io/?templates=windows,visualstudiocode,python,database
 
+### Virtual Environment ###
+venv/
+
 ### Database ###
 *.accdb
 *.db
