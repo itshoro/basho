@@ -3,11 +3,6 @@ window.addEventListener("load", function() {
     formParent = document.getElementsByClassName("login_wrapper")[0];
 });
 
-function toggleRegisterForm() {
-    const loginForm = document.querySelectorAll("form")[0].classList.toggle("hide");
-    const registerForm = this.document.querySelectorAll("form")[1].classList.toggle("hide");
-}
-
 function login() {
     const loginForm = document.querySelectorAll("form")[0];
 
