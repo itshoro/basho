@@ -1,7 +1,15 @@
 # File created using '.gitignore Generator' for Visual Studio Code: https://bit.ly/vscode-gig
 
-# Created by https://www.gitignore.io/api/windows,visualstudiocode,python
-# Edit at https://www.gitignore.io/?templates=windows,visualstudiocode,python
+# Created by https://www.gitignore.io/api/windows,visualstudiocode,python,database
+# Edit at https://www.gitignore.io/?templates=windows,visualstudiocode,python,database
+
+### Database ###
+*.accdb
+*.db
+*.dbf
+*.mdb
+*.pdb
+*.sqlite3
 
 ### Python ###
 # Byte-compiled / optimized / DLL files
@@ -145,7 +153,7 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
-# End of https://www.gitignore.io/api/windows,visualstudiocode,python
+# End of https://www.gitignore.io/api/windows,visualstudiocode,python,database
 
 # Custom rules (everything added below won't be overriden by 'Generate .gitignore File' if you use 'Update' option)
 
