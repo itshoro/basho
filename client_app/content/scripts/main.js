@@ -11,7 +11,6 @@ function login() {
 
     createPostHttpRequest("/login", `email=${email}&password=${password}`,
         () => {
-            debugger;
             window.location.reload();
         }, 
         (obj) => {
@@ -41,16 +40,12 @@ function createPostHttpRequest(url, urlEncodedParameters, onSuccessCallback, onE
 }
 
 function register() {
-    const registerForm = document.querySelectorAll("form")[1];
+    const registerForm = document.querySelectorAll("form")[0];
 
     let email = registerForm["email"].value;
     let password = registerForm["password"].value;
 
     if (password !== registerForm["passwordSafety"].value) {
-        if (obj.status === 500) {
-            createError("It seems, that we can't reach our authentication servers.\nPlease try again later.");
-            return;
-        }
         createError("Passwords don't match!");
         return;
     }
