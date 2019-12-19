@@ -1,9 +1,9 @@
-import requests
 import json
-
 import threading
 import time
 from random import randint, uniform
+
+import requests
 
 class DeviceEmulator:
     def __init__(self, deviceTokens = [], amount = 4):
