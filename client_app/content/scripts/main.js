@@ -11,6 +11,7 @@ function login() {
 
     createPostHttpRequest("/login", `email=${email}&password=${password}`,
         () => {
+            debugger;
             window.location.reload();
         }, 
         (obj) => {
@@ -90,7 +91,7 @@ function createError(msg) {
     closeSpan.addEventListener("click", removeError);
     error.appendChild(closeSpan);
 
-    let wrapper = document.querySelector(".login:not(.hide)")
+    let wrapper = document.querySelector(".login:not(.hide)");
     wrapper.insertBefore(error, wrapper.children[1]);
     showsError = true;
 }

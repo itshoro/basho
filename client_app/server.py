@@ -15,6 +15,9 @@ class CustomHTTPError(cherrypy.HTTPError):
     def __init__(self, status, message):
         super().__init__(status, message)
 
+    def get_message(self):
+        return self._message
+
     def set_response(self):
         super().set_response()
         response = cherrypy.serving.response
@@ -37,12 +40,18 @@ class LoginHandler:
         self._ERROR_USER_ALREADY_EXISTS = "An account with that Email already exists."
         self._ERROR_USER_DOES_NOT_EXIST = "An account with that Email does not exist."
 
+        self._ERROR_SERVER_UNREACHABLE = "Couldn't reach validation server. Please try again later."
+
     @cherrypy.expose
-    def index(self):
+    def index(self, error = None):
         if (len(cherrypy.request.cookie) == 2 and cherrypy.request.cookie["sessionToken"]):
-            return self.tryValidateAndRecoverSession()
+            try:
+                return self.tryValidateAndRecoverSession()
+            except:
+                return self.view.create_view("login", { "form": "login", "error": self._ERROR_SERVER_UNREACHABLE })
+
         else:
-            return self.view.create_view("login", { "form": "login", "error": None })
+            return self.view.create_view("login", { "form": "login", "error": error.get_message() })
 
     @cherrypy.expose
     def register(self, email, password):
@@ -71,7 +80,7 @@ class LoginHandler:
         self.dbSocket.close()
 
     def redirectToHome(self):
-        return open("index.html")
+        return self.view.create_view("index", None, None)
 
     def createSaltedPassword(self, password, salt):
         passHash = hashlib.sha1()
@@ -92,8 +101,7 @@ class LoginHandler:
 
         if not cherrypy.request.cookie["user_id"]:
             self.clearCookies()
-            # TODO: Open Login page and somehow trigger the js for an error
-            raise CustomHTTPError(403, self._ERROR_SESSION_EXPIRED)
+            return self.index(CustomHTTPError(403, self._ERROR_SESSION_EXPIRED))
 
         self.dbSocket = socket.socket()
         self.dbSocket.connect(("127.0.0.1", 50007)) # TODO: Resolve via DNS
@@ -116,8 +124,7 @@ class LoginHandler:
         else:
             self.dbSocket.close()
             self.clearCookies()
-            # TODO: Create Templating Engine, that can take an error as an optional parameter. Redirect to login here, I already adjusted the login.html to be able to display an error, when passed as the parameter "error"
-            raise CustomHTTPError(403, self._ERROR_SESSION_EXPIRED)
+            return self.index(CustomHTTPError(403, self._ERROR_SESSION_EXPIRED))
 
     @cherrypy.expose
     def toggleForm(self, formState):

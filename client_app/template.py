@@ -13,6 +13,7 @@ class TemplateHandler:
                 "login.html"
             ],
             "index": [
+                self._create_index_site,
                 "index.html"
             ]
         }
@@ -30,6 +31,9 @@ class TemplateHandler:
             print(exceptions.text_error_template().render())
             markup = exceptions.html_error_template().render()
         return markup
+
+    def _create_index_site(self, templateName, data, userId = None):
+        return self.lookup.get_template(templateName).render()
 
     def create_view(self, type, data, userId = None):
         markup = ""

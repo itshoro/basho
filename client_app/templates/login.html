@@ -10,7 +10,7 @@
     <link rel="stylesheet" href="style/style.css">
     % if error != None:
     <script>
-        createError("$error");
+        document.addEventListener("DOMContentLoaded", () => {createError("${error}")});
     </script>
     % endif
 </head>
