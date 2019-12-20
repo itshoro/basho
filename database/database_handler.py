@@ -21,28 +21,29 @@ class FetchThread():
             s.listen(1) # Only listen to one Connection at a time.
 
             # Listen forever
+            # TODO Add timeout
             while True:
                 client_connection, client_address = s.accept()
                 with client_connection:
                     print(f"New connection by {client_address}")
-                    while True: # FIXME Right now we just read 4kb of data. We should change this so the client specifies the data length.
-                        data = client_connection.recv(32768) # Max. 4Kbites of data
-                        if not data:
-                            break
+                    data = client_connection.recv(32768) # Max. 4Kbites of data
+                    if not data:
+                        client_connection.close()
 
-                        decoded = data.decode("utf-8")
-                        received = json.loads(decoded)
+                    decoded = data.decode("utf-8")
+                    received = json.loads(decoded)
 
-                        result = self.database.handle(received)
-                        if(result[0]):
-                            print(f"Sucessfully handled the following input: {decoded}")
-                            if (result[1]):
-                                client_connection.sendall(bytes(str(result[2]), "utf-8"))
-                                print(f"Responding with: {result[2]}")
-                        else:
-                            print(f"Something failed while handeling the input: {decoded}")
-                            client_connection.close()
-                            break
+                    result = self.database.handle(received)
+
+                    if(result[0]):
+                        print(f"Sucessfully handled the following input: {decoded}")
+                        print(f"Responding with: {result[1]}")
+                        client_connection.sendall(bytes(str(result[1]), "utf-8"))
+                    else:
+                        print(f"Something failed while handeling the input: {decoded}")
+
+                    print(f"Closing connection for {client_connection}")
+                    client_connection.close()
 
 
 class Database():
@@ -134,7 +135,7 @@ class Database():
         print (f"Searching if user with email \"{email}\" already exists.")
         print (f"Found {rowcount} entries with the specified email.")
         if (rowcount > 0):
-            return False, False, None # If the email is already registered, let this fail
+            return False, None # If the email is already registered, let this fail
 
         cur.execute('''
             INSERT INTO users(email,password,salt)
@@ -145,7 +146,7 @@ class Database():
         id = cur.lastrowid
         cur.close()
         self.connection.commit()
-        return rowcount == 1, True, id
+        return rowcount == 1, id
 
     def salt(self, email):
         cur = self.connection.cursor()
@@ -154,10 +155,10 @@ class Database():
         ''', [email]).fetchone()
         
         if (data == None or len(data) == 0):
-            return False, False, None
+            return False, None
 
         cur.close()
-        return True, True, data[0]
+        return True, data[0]
 
     def login(self, email, password):
         cur = self.connection.cursor()
@@ -168,7 +169,7 @@ class Database():
         cur.close()
         if (data == None):
             # No user with the email and password combo is found => invalid data.
-            return False, False, None
+            return False, None
 
         # User credentials were correct, create a new session.
         # Sessions are valid for 7 days.
@@ -191,7 +192,7 @@ class Database():
             "user_id": data[0],
             "sessionToken": token
         }
-        return True, True, response
+        return True, response
 
     def generateSessionToken(self):
         return secrets.token_hex(8) # 16 character random string, ref: https://stackoverflow.com/a/50842164
@@ -206,7 +207,7 @@ class Database():
 
         cur.close()
         self.connection.commit()
-        return True, True, device[0]
+        return True, device[0]
 
     # FIXME: Test this
     def add_data(self, user_id, device_id, data = None): # Ommiting data 
@@ -247,7 +248,7 @@ class Database():
             expiryTime = datetime.datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
             if expiryTime < datetime.datetime.now():
                 self.clearSession(user_id)
-                return False, False, None
+                return False, None
             
             cur.execute('''
                 UPDATE users
@@ -256,10 +257,10 @@ class Database():
             ''', [datetime.datetime.now() + datetime.timedelta(days=7), user_id])
             cur.close()
             self.connection.commit()
-            return True, True, session_token
+            return True, session_token
 
         self.clearSession(user_id)
-        return False, False, None
+        return False, None
 
     def clearSession(self, user_id):
         cur = self.connection.cursor()
@@ -273,7 +274,6 @@ class Database():
 
     # Handle returns output in the following format:
     #  - Sucessfully handled Request: True / False
-    #  - Has data to return to the client: True / False
     #  - Data that should be returned: obj
     def handle(self, input:dict):
         # TODO Currently a user could send requests without the right body.
@@ -288,7 +288,7 @@ class Database():
         elif (input["type"] == "VALIDATE_SESSION"):
             return self.try_validate_session(input["user_id"], input["token"])
 
-        return False, False, None
+        return False, None
 
 
 # db = Database("Main")
