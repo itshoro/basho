@@ -24,6 +24,13 @@ class CustomHTTPError(cherrypy.HTTPError):
     def __str__(self):
         return self._message
 
+# TODO: Test what happens when something like the following happens:
+# - user tries to login
+# - correct credentials
+# - GET_SALT => user salt
+# - database handler now closes suddenly
+# - LOGIN => Timeout on DB => ?
+
 class LoginHandler:
     def __init__(self):
         self.view = TemplateHandler(os.path.join(sys.path[0], "templates"))
@@ -59,7 +66,6 @@ class LoginHandler:
 
     @cherrypy.expose
     def register(self, email, password):
-        self.mediator.create() # TODO: Resolve via DNS
         salt = secrets.token_hex(8) # 16 character random string, ref: https://stackoverflow.com/a/50842164
         
         hashedPassword = self.createSaltedPassword(password, salt)
@@ -71,6 +77,7 @@ class LoginHandler:
                 "salt": "{salt}"
             }}
         '''
+        self.mediator.create()
         try:
             id = self.mediator.send(jsonRequest)
         except:
@@ -102,7 +109,6 @@ class LoginHandler:
             self.clearCookies()
             return self.index(CustomHTTPError(403, server_constants.ERROR_SESSION_EXPIRED))
 
-        self.mediator.create() # TODO: Resolve via DNS
         jsonRequest = f'''
             {{
                 "type": "{server_constants.TYPE_VALIDATE_SESSION}",
@@ -110,6 +116,7 @@ class LoginHandler:
                 "user_id": "{cherrypy.request.cookie["user_id"].value}"
             }}
         '''
+        self.mediator.create()
         try:
             self.mediator.send(jsonRequest)
             return self.redirectToHome()
@@ -134,6 +141,7 @@ class LoginHandler:
                 "password": "{password}"
             }}
         '''
+        self.mediator.create()
         try:
             data = self.mediator.send(jsonRequest).replace("'", "\"")
             responseData = json.loads(data)
@@ -157,7 +165,7 @@ class LoginHandler:
                 "email": "{email}"
             }}
         '''
-        self.mediator.create() # TODO Resolve DNS
+        self.mediator.create()
         try:
             # Salt is found, user exists.
             # Create hashed password and try to login.
@@ -168,7 +176,6 @@ class LoginHandler:
             # Salt wasn't found, the user entered an invalid Email.
             # Consider to instead notify with server_constants.ERROR_LOGIN_OR_PASSWORD_WRONG
             raise CustomHTTPError(400, server_constants.ERROR_USER_DOES_NOT_EXIST)
-
         return self.tryLoginAndStartSession(email, hashedPassword)
 
 

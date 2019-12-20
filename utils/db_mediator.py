@@ -1,10 +1,8 @@
 from socket import socket
 
 class Mediator:
-    def __init__(self):
-        self.socket = socket()
-
     def create(self, url = ("127.0.0.1", 50007)):
+        self.socket = socket()
         self.socket.connect(url)
 
     def close(self):
@@ -16,7 +14,7 @@ class Mediator:
         data = self.socket.recv(recv_length)
         
         if data:
-            return data.decode(encoding)
+            return data.decode("utf-8")
         else:
             self.socket.close()
             raise InterruptedError()
