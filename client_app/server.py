@@ -38,18 +38,6 @@ class LoginHandler:
         self.formState = 0 # 0 = Login, 1 = Register
         self.forms = ["login", "register"]
 
-        server_constants.TYPE_REGISTER_USER = "REGISTER"
-        server_constants.TYPE_LOGIN_USER = "LOGIN"
-        server_constants.TYPE_GET_SALT = "GET_SALT"
-        server_constants.TYPE_VALIDATE_SESSION = "VALIDATE_SESSION"
-
-        server_constants.ERROR_LOGIN_OR_PASSWORD_WRONG = "Your Email or password is invalid."
-        server_constants.ERROR_SESSION_EXPIRED = "Your session is expired, please login again."
-        server_constants.ERROR_USER_ALREADY_EXISTS = "An account with that Email already exists."
-        server_constants.ERROR_USER_DOES_NOT_EXIST = "An account with that Email does not exist."
-
-        server_constants.ERROR_SERVER_UNREACHABLE = "Couldn't reach validation server. Please try again later."
-
     @cherrypy.expose
     def index(self, error = None):
         if (len(cherrypy.request.cookie) == 2 and cherrypy.request.cookie["sessionToken"]):
