@@ -85,5 +85,5 @@ class Device(Resource):
 app = Flask(__name__)
 api = Api(app)
 
-api.add_resource(Device, "/device/<str:token>/<data>")
+api.add_resource(Device, "/device/<token>/<data>")
 app.run(debug=True)

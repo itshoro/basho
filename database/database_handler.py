@@ -7,6 +7,8 @@ import json
 
 import datetime
 
+import utils.server_constants as types
+
 # class FetchThread(threading.Thread):
 class FetchThread():
     # def __init__(self, db):
@@ -96,11 +98,12 @@ class Database():
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS devices(
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                token TEXT NOT NULL,
                 ownerId Integer NOT NULL,
                 name TEXT,
                 
-                X_coordinate INTEGER NOT NULL,
-                Y_coordinate INTEGER NOT NULL,
+                X_coordinate INTEGER,
+                Y_coordinate INTEGER,
 
                 FOREIGN KEY (ownerId) REFERENCES users(ID)
             )
@@ -272,6 +275,12 @@ class Database():
         cur.close()
         self.connection.commit()
 
+    def delete_device(self, parameter_list):
+        pass
+
+    def verify_device(self, parameter_list):
+        pass
+
     # Handle returns output in the following format:
     #  - Sucessfully handled Request: True / False
     #  - Data that should be returned: obj
@@ -279,14 +288,27 @@ class Database():
         # TODO Currently a user could send requests without the right body.
         # Sanitize the input dict, and check if it has the necessary keys.
 
-        if (input["type"] == "REGISTER"):
+        if (input["type"] == types.TYPE_REGISTER_USER):
             return self.create_new_user(input["email"], input["password"], input["salt"])
-        elif (input["type"] == "GET_SALT"):
+        elif (input["type"] == types.TYPE_GET_SALT):
             return self.salt(input["email"])
-        elif (input["type"] == "LOGIN"):
+        elif (input["type"] == types.TYPE_LOGIN_USER):
             return self.login(input["email"], input["password"])
-        elif (input["type"] == "VALIDATE_SESSION"):
+        elif (input["type"] == types.TYPE_VALIDATE_SESSION):
             return self.try_validate_session(input["user_id"], input["token"])
+        elif (input["type"] == types.TYPE_ADD_DEVICE):
+            if (self.try_validate_session(input["user_id"], input["token"])[0]):
+                # Set X and Y in web interface, TODO: Create endpoint for moving
+                return self.add_device(input["user_id"], input["device"]["name"])
+        elif (input["type"] == types.TYPE_ADD_DEVICE_DATA):
+            if (self.try_validate_session(input["user_id"], input["token"])[0]):
+                return self.add_data(input["user_id"], input["device"]["token"], input["data"])
+        elif (input["type"] == types.TYPE_DELETE_DEVICE):
+            if (self.try_validate_session(input["user_id"], input["token"])[0]):
+                return self.delete_device(input["device"]["token"])
+        elif (input["type"] == types.TYPE_VERIFY_DEVICE):
+            if (self.try_validate_session(input["user_id"], input["input"])[0]):
+                return self.verify_device(...)
 
         return False, None
 
