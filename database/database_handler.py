@@ -159,10 +159,19 @@ class Database():
         If there is no corresponding function, it returns a "False". As would be the case with a failed request.
         If the type *doesn't* exist it raises a ValueError.
         """
-        if (type not in vars(types)):
-            raise ValueError("Type is not supported.")
+
+        # For comedic relieve: I invested twenty minutes into writing the following commented code that allows me to get the content of
+        # all the type variables, until I realized through rubber duck debugging, that this is unecessary, since the following code will
+        # just waste computation power and will not bring anything to the table, since it would be the same end result if I just traverse
+        # through the if / else.
+        # --- Enjoy ---
+        # members = [attr for attr in vars(types) if not callable(getattr(types, attr)) and not attr.startswith("__")]
+        # supportedMembers = [member for member in members.keys() if not member.contains(" ")]
+
+        # if (type not in supportedMembers):
+        #     raise ValueError("Type is not supported.")
         
-        elif type == types.TYPE_LOGIN_USER:
+        if type == types.TYPE_LOGIN_USER:
             return self.user.login
         elif type == types.TYPE_REGISTER_USER:
             return self.user.register
