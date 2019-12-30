@@ -218,7 +218,7 @@ class UserHelper:
 
         response = {
             "user_id": data[0],
-            "sessionToken": token
+            "token": token
         }
         return True, response
 
@@ -262,10 +262,10 @@ class UserHelper:
         # TODO Commit
 
     def verify_active_session(self, cursor, **args):
-        self.stopRequestOnInsufficientArguments({"user_id", "session_token"}, args)
+        self.stopRequestOnInsufficientArguments({"user_id", "token"}, args)
         result = cursor.execute('''
             SELECT sessionExpiry from users WHERE ID = (?) AND sessionToken = (?)
-        ''', [args["user_id"], args["session_token"]]).fetchone()
+        ''', [args["user_id"], args["token"]]).fetchone()
 
         if result:
             expiryTime = datetime.datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
@@ -279,7 +279,7 @@ class UserHelper:
                 WHERE ID = (?)
             ''', [datetime.datetime.now() + datetime.timedelta(days=7), args["user_id"]])()
             # TODO Commit
-            return True, args["session_token"]
+            return True, args["token"]
 
         self._clearSession(cursor, args["user_id"])
         return False, None

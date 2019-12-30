@@ -40,7 +40,7 @@ class LoginHandler:
 
     @cherrypy.expose
     def index(self, error = None):
-        if (len(cherrypy.request.cookie) == 2 and cherrypy.request.cookie["sessionToken"]):
+        if (len(cherrypy.request.cookie) == 2 and cherrypy.request.cookie["token"]):
             try:
                 return self.tryValidateAndRecoverSession()
             except:
@@ -100,7 +100,7 @@ class LoginHandler:
         jsonRequest = f'''
             {{
                 "type": "{server_constants.TYPE_VALIDATE_SESSION}",
-                "token": "{cherrypy.request.cookie["sessionToken"].value}",
+                "token": "{cherrypy.request.cookie["token"].value}",
                 "user_id": "{cherrypy.request.cookie["user_id"].value}"
             }}
         '''
@@ -134,7 +134,7 @@ class LoginHandler:
             data = self.mediator.send(jsonRequest).replace("'", "\"")
             responseData = json.loads(data)
 
-            cherrypy.response.cookie["sessionToken"] = responseData["sessionToken"]
+            cherrypy.response.cookie["token"] = responseData["token"]
             cherrypy.response.cookie["user_id"] = responseData["user_id"]
             return self.redirectToHome()
         except:
