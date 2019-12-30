@@ -35,7 +35,7 @@ class FetchThread():
                     decoded = data.decode("utf-8")
                     received = json.loads(decoded)
 
-                    result = self.database.handle(received)
+                    result = self.database.execute_function(received["type"], received)
 
                     if(result[0]):
                         print(f"Sucessfully handled the following input: {decoded}")
@@ -146,15 +146,14 @@ class Database():
         else:
             return False
 
-    def execute_function(self, type, auth=None):
-        if (self.requires_authentication(type) and auth == None):
+    def execute_function(self, type, args):
+        if self.requires_authentication(type) and "auth" not in args.keys():
             return False
         function = self.get_function_from_type(type)
         with self.connection.cursor() as cursor:
-            # TODO functions should use *args and check for the correct number of args.
-            return function(cursor,)
+            return function(cursor, **args)
 
-    def get_function_from_type(self, type):
+    def get_function_from_type(self, args):
         """
         Returns the corresponding function to a type if it can find in the shared type library.
         If there is no corresponding function, it returns a "False". As would be the case with a failed request.
@@ -162,59 +161,42 @@ class Database():
         """
         if (type not in vars(types)):
             raise ValueError("Type is not supported.")
-        if type == types.TYPE_ADD_DEVICE:
-            pass
-        elif type == types.TYPE_ADD_DEVICE_DATA:
-            pass
-        elif type == types.TYPE_GET_SALT:
-            return self.user.get_salt
+        
         elif type == types.TYPE_LOGIN_USER:
             return self.user.login
-        elif type == types.TYPE_MOVE_DEVICE:
-            pass
         elif type == types.TYPE_REGISTER_USER:
             return self.user.register
+        elif type == types.TYPE_GET_SALT:
+            return self.user.get_salt
         elif type == types.TYPE_VALIDATE_SESSION:
             return self.user.verify_active_session
+
+        elif type == types.TYPE_ADD_DEVICE:
+            raise NotImplementedError()
+        elif type == types.TYPE_ADD_DEVICE_DATA:
+            raise NotImplementedError()
+        elif type == types.TYPE_MOVE_DEVICE:
+            raise NotImplementedError()
         elif type == types.TYPE_VERIFY_DEVICE:
-            pass
+            raise NotImplementedError()
+            
         # TODO If you send direct requests you could possibly call a raise, even after I implemented all types.
         # Return a false instead and then check for it in the calling function, or an empty callable, or function
         # that returns an error.
         raise NotImplementedError()
 
 class UserHelper:
-    def register(self, cursor, email, password, salt):
-        rowcount = len(cursor.execute('''
-            SELECT * FROM users WHERE email = (?)
-        ''', [email]).fetchall()) # cur.rowcount returns -1 after a SELECT, because the API does not specify a way to receive the number of rows
-        print (f"Searching if user with email \"{email}\" already exists.")
-        print (f"Found {rowcount} entries with the specified email.")
-        if (rowcount > 0):
-            return False, None # If the email is already registered, let this fail
 
-        cursor.execute('''
-            INSERT INTO users(email,password,salt)
-            VALUES (?,?,?)
-        ''', (email, password, salt))
+    def stopRequestOnInsufficientArguments(self, required_arguments: list, actual_arguments : dict, error = None):
+        if set(required_arguments).issubset(set(actual_arguments.items())):
+            raise error or ValueError("Insufficient Arguments.")
 
-    def get_salt(self, cursor, email):
-        data = cursor.execute('''
-            SELECT salt FROM users WHERE email = (?)
-        ''', [email]).fetchone()
-        
-        if (data == None or len(data) == 0):
-            return False, None
+    def login(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"email", "password"}, args)
 
-        return True, data[0]
-
-    def _generateSessionToken(self):
-        return secrets.token_hex(8) # 16 character random string, ref: https://stackoverflow.com/a/50842164
-
-    def login(self, cursor, email, password):
         data = cursor.execute('''
             SELECT ID FROM users WHERE email = (?) AND password = (?)
-        ''', [email, password]).fetchone()
+        ''', [args["email"], args["password"]]).fetchone()
         if (data == None):
             # No user with the email and password combo is found => invalid data.
             return False, None
@@ -240,6 +222,37 @@ class UserHelper:
         }
         return True, response
 
+    def register(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"email", "password", "salt"}, args)
+
+        rowcount = len(cursor.execute('''
+            SELECT * FROM users WHERE email = (?)
+        ''', [args["email"]]).fetchall()) # cur.rowcount returns -1 after a SELECT, because the API does not specify a way to receive the number of rows
+        print (f"Searching if user with email \"{args['email']}\" already exists.")
+        print (f"Found {rowcount} entries with the specified email.")
+        if (rowcount > 0):
+            return False, None # If the email is already registered, let this fail
+
+        cursor.execute('''
+            INSERT INTO users(email,password,salt)
+            VALUES (?,?,?)
+        ''', (args["email"], args["password"], args["salt"]))
+
+    def get_salt(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"email"}, args)
+
+        data = cursor.execute('''
+            SELECT salt FROM users WHERE email = (?)
+        ''', [args["email"]]).fetchone()
+        
+        if (data == None or len(data) == 0):
+            return False, None
+
+        return True, data[0]
+
+    def _generateSessionToken(self):
+        return secrets.token_hex(8) # 16 character random string, ref: https://stackoverflow.com/a/50842164
+
     def _clearSession(self, cursor, user_id):
         cursor.execute('''
             UPDATE users 
@@ -248,26 +261,27 @@ class UserHelper:
         ''', [user_id])
         # TODO Commit
 
-    def verify_active_session(self, cursor, user_id, session_token):
+    def verify_active_session(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"user_id", "session_token"}, args)
         result = cursor.execute('''
             SELECT sessionExpiry from users WHERE ID = (?) AND sessionToken = (?)
-        ''', [user_id, session_token]).fetchone()
+        ''', [args["user_id"], args["session_token"]]).fetchone()
 
         if result:
             expiryTime = datetime.datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
             if expiryTime < datetime.datetime.now():
-                self._clearSession(cursor, user_id)
+                self._clearSession(cursor, args["user_id"])
                 return False, None
             
             cursor.execute('''
                 UPDATE users
                 SET sessionExpiry = (?)
                 WHERE ID = (?)
-            ''', [datetime.datetime.now() + datetime.timedelta(days=7), user_id])()
+            ''', [datetime.datetime.now() + datetime.timedelta(days=7), args["user_id"]])()
             # TODO Commit
-            return True, session_token
+            return True, args["session_token"]
 
-        self._clearSession(cursor, user_id)
+        self._clearSession(cursor, args["user_id"])
         return False, None
 
 # TODO: Implement API Endpoints
