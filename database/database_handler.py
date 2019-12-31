@@ -22,8 +22,8 @@ class FetchThread():
             s.bind(("127.0.0.1", 50007)) # TODO: Resolve via DNS
             s.listen(1) # Only listen to one Connection at a time.
 
-            # Listen forever
             # TODO Add timeout
+            # Listen forever
             while True:
                 client_connection, client_address = s.accept()
                 with client_connection:
@@ -34,9 +34,7 @@ class FetchThread():
 
                     decoded = data.decode("utf-8")
                     received = json.loads(decoded)
-
                     result = self.database.execute_function(received["type"], received)
-
                     if(result[0]):
                         print(f"Sucessfully handled the following input: {decoded}")
                         print(f"Responding with: {result[1]}")
@@ -150,10 +148,20 @@ class Database():
         if self.requires_authentication(type) and "auth" not in args.keys():
             return False
         function = self.get_function_from_type(type)
-        with self.connection.cursor() as cursor:
-            return function(cursor, **args)
+        
+        cursor = self.connection.cursor()
+        try:
+            result = function(cursor, **args)
+        except:
+            return False, None
+        finally:
+            cursor.close()
 
-    def get_function_from_type(self, args):
+        if result and self.connection.total_changes > 0:
+            self.connection.commit()
+        return result
+
+    def get_function_from_type(self, type):
         """
         Returns the corresponding function to a type if it can find in the shared type library.
         If there is no corresponding function, it returns a "False". As would be the case with a failed request.
@@ -188,11 +196,8 @@ class Database():
             raise NotImplementedError()
         elif type == types.TYPE_VERIFY_DEVICE:
             raise NotImplementedError()
-            
-        # TODO If you send direct requests you could possibly call a raise, even after I implemented all types.
-        # Return a false instead and then check for it in the calling function, or an empty callable, or function
-        # that returns an error.
-        raise NotImplementedError()
+        else:
+            raise NotImplementedError()
 
 class UserHelper:
 
@@ -223,8 +228,6 @@ class UserHelper:
             datetime.datetime.now() + datetime.timedelta(days=7),
             data[0]
         ])
-        # TODO Commit
-
         response = {
             "user_id": data[0],
             "token": token
@@ -247,6 +250,10 @@ class UserHelper:
             VALUES (?,?,?)
         ''', (args["email"], args["password"], args["salt"]))
 
+        rowcount = cursor.rowcount
+        id = cursor.lastrowid
+        return rowcount == 1, id
+
     def get_salt(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"email"}, args)
 
@@ -268,7 +275,6 @@ class UserHelper:
             SET sessionToken = NULL AND sessionExpiry = NULL
             WHERE ID = (?)
         ''', [user_id])
-        # TODO Commit
 
     def verify_active_session(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"user_id", "token"}, args)
@@ -286,8 +292,7 @@ class UserHelper:
                 UPDATE users
                 SET sessionExpiry = (?)
                 WHERE ID = (?)
-            ''', [datetime.datetime.now() + datetime.timedelta(days=7), args["user_id"]])()
-            # TODO Commit
+            ''', [datetime.datetime.now() + datetime.timedelta(days=7), args["user_id"]])
             return True, args["token"]
 
         self._clearSession(cursor, args["user_id"])
