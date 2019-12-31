@@ -9,7 +9,6 @@ import datetime
 
 import utils.server_constants as types
 
-# class FetchThread(threading.Thread):
 class FetchThread():
     # def __init__(self, db):
     def __init__(self):
