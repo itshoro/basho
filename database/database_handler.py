@@ -22,8 +22,8 @@ class FetchThread():
             s.bind(("127.0.0.1", 50007)) # TODO: Resolve via DNS
             s.listen(1) # Only listen to one Connection at a time.
 
-            # Listen forever
             # TODO Add timeout
+            # Listen forever
             while True:
                 client_connection, client_address = s.accept()
                 with client_connection:
@@ -34,9 +34,7 @@ class FetchThread():
 
                     decoded = data.decode("utf-8")
                     received = json.loads(decoded)
-
-                    result = self.database.handle(received)
-
+                    result = self.database.execute_function(received["type"], received)
                     if(result[0]):
                         print(f"Sucessfully handled the following input: {decoded}")
                         print(f"Responding with: {result[1]}")
@@ -48,29 +46,18 @@ class FetchThread():
                     client_connection.close()
 
 
+
+# Currently any of the ...Helper classes pose a potential security risk and could be made more secure, by
+# instead of requiring the ownerId / mapId, we would require the users sessionToken
 class Database():
     def __init__(self, name):
         self.name = name
         self.connection = sqlite3.connect("auth_users.db")
+
+        self.user = UserHelper()
+
         print("Connected successfully to the database.")
         self.setupDatabase()
-
-    def create_connection(self, db_file):
-        try:
-            self.connection = sqlite3.connect(db_file)
-            print("Successfully connected to the database. ", sqlite3.version)
-        except sqlite3.Error as e:
-            print(e)
-        finally:
-            if self.connection:
-                self.connection.close()
-
-    def executeSql(self, createTableSql):
-        try:
-            cur = self.connection.cursor()
-            cur.execute(createTableSql)
-        except sqlite3.Error as e:
-            print(e)
 
     def setupDatabase(self):
         self.executeSql('''
@@ -129,56 +116,109 @@ class Database():
             )
         ''')
 
-    def create_new_user(self, email, password, salt):
-        cur = self.connection.cursor()
+    def executeSql(self, createTableSql):
+        try:
+            cur = self.connection.cursor()
+            cur.execute(createTableSql)
+        except sqlite3.Error as e:
+            print(e)
 
-        rowcount = len(cur.execute('''
-            SELECT * FROM users WHERE email = (?)
-        ''', [email]).fetchall()) # cur.rowcount returns -1 after a SELECT, because the API does not specify a way to receive the number of rows
-        print (f"Searching if user with email \"{email}\" already exists.")
-        print (f"Found {rowcount} entries with the specified email.")
-        if (rowcount > 0):
-            return False, None # If the email is already registered, let this fail
 
-        cur.execute('''
-            INSERT INTO users(email,password,salt)
-            VALUES (?,?,?)
-        ''', (email, password, salt))
+    def create_connection(self, db_file):
+        try:
+            self.connection = sqlite3.connect(db_file)
+            print("Successfully connected to the database. ", sqlite3.version)
+        except sqlite3.Error as e:
+            print(e)
+        finally:
+            if self.connection:
+                self.connection.close()
 
-        rowcount = cur.rowcount
-        id = cur.lastrowid
-        cur.close()
-        self.connection.commit()
-        return rowcount == 1, id
+    def requires_authentication(self, type):
+        if (type == types.TYPE_ADD_DEVICE):
+            return True
+        elif (type == types.TYPE_DELETE_DEVICE):
+            return True
+        elif (type == types.TYPE_MOVE_DEVICE):
+            return True
+        else:
+            return False
 
-    def salt(self, email):
-        cur = self.connection.cursor()
-        data = cur.execute('''
-            SELECT salt FROM users WHERE email = (?)
-        ''', [email]).fetchone()
+    def execute_function(self, type, args):
+        if self.requires_authentication(type) and "auth" not in args.keys():
+            return False
+        function = self.get_function_from_type(type)
         
-        if (data == None or len(data) == 0):
+        cursor = self.connection.cursor()
+        try:
+            result = function(cursor, **args)
+        except:
             return False, None
+        finally:
+            cursor.close()
 
-        cur.close()
-        return True, data[0]
+        if result and self.connection.total_changes > 0:
+            self.connection.commit()
+        return result
 
-    def login(self, email, password):
-        cur = self.connection.cursor()
-        data = cur.execute('''
+    def get_function_from_type(self, type):
+        """
+        Returns the corresponding function to a type if it can find in the shared type library.
+        If there is no corresponding function, it returns a "False". As would be the case with a failed request.
+        If the type *doesn't* exist it raises a ValueError.
+        """
+
+        # For comedic relieve: I invested twenty minutes into writing the following commented code that allows me to get the content of
+        # all the type variables, until I realized through rubber duck debugging, that this is unecessary, since the following code will
+        # just waste computation power and will not bring anything to the table, since it would be the same end result if I just traverse
+        # through the if / else.
+        # --- Enjoy ---
+        # members = [attr for attr in vars(types) if not callable(getattr(types, attr)) and not attr.startswith("__")]
+        # supportedMembers = [member for member in members.keys() if not member.contains(" ")]
+
+        # if (type not in supportedMembers):
+        #     raise ValueError("Type is not supported.")
+        
+        if type == types.TYPE_LOGIN_USER:
+            return self.user.login
+        elif type == types.TYPE_REGISTER_USER:
+            return self.user.register
+        elif type == types.TYPE_GET_SALT:
+            return self.user.get_salt
+        elif type == types.TYPE_VALIDATE_SESSION:
+            return self.user.verify_active_session
+
+        elif type == types.TYPE_ADD_DEVICE:
+            raise NotImplementedError()
+        elif type == types.TYPE_ADD_DEVICE_DATA:
+            raise NotImplementedError()
+        elif type == types.TYPE_MOVE_DEVICE:
+            raise NotImplementedError()
+        elif type == types.TYPE_VERIFY_DEVICE:
+            raise NotImplementedError()
+        else:
+            raise NotImplementedError()
+
+class UserHelper:
+
+    def stopRequestOnInsufficientArguments(self, required_arguments: list, actual_arguments : dict, error = None):
+        if set(required_arguments).issubset(set(actual_arguments.items())):
+            raise error or ValueError("Insufficient Arguments.")
+
+    def login(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"email", "password"}, args)
+
+        data = cursor.execute('''
             SELECT ID FROM users WHERE email = (?) AND password = (?)
-        ''', [email, password]).fetchone()
-
-        cur.close()
+        ''', [args["email"], args["password"]]).fetchone()
         if (data == None):
             # No user with the email and password combo is found => invalid data.
             return False, None
 
         # User credentials were correct, create a new session.
         # Sessions are valid for 7 days.
-        cur = self.connection.cursor()
-        token = self.generateSessionToken()
-        cur.execute('''
+        token = self._generateSessionToken()
+        cursor.execute('''
             UPDATE users
             SET sessionToken = (?), sessionExpiry = (?)
             WHERE ID = (?)
@@ -188,133 +228,141 @@ class Database():
             datetime.datetime.now() + datetime.timedelta(days=7),
             data[0]
         ])
-        cur.close()
-        self.connection.commit()
-
         response = {
             "user_id": data[0],
-            "sessionToken": token
+            "token": token
         }
         return True, response
 
-    def generateSessionToken(self):
+    def register(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"email", "password", "salt"}, args)
+
+        rowcount = len(cursor.execute('''
+            SELECT * FROM users WHERE email = (?)
+        ''', [args["email"]]).fetchall()) # cur.rowcount returns -1 after a SELECT, because the API does not specify a way to receive the number of rows
+        print (f"Searching if user with email \"{args['email']}\" already exists.")
+        print (f"Found {rowcount} entries with the specified email.")
+        if (rowcount > 0):
+            return False, None # If the email is already registered, let this fail
+
+        cursor.execute('''
+            INSERT INTO users(email,password,salt)
+            VALUES (?,?,?)
+        ''', (args["email"], args["password"], args["salt"]))
+
+        rowcount = cursor.rowcount
+        id = cursor.lastrowid
+        return rowcount == 1, id
+
+    def get_salt(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"email"}, args)
+
+        data = cursor.execute('''
+            SELECT salt FROM users WHERE email = (?)
+        ''', [args["email"]]).fetchone()
+        
+        if (data == None or len(data) == 0):
+            return False, None
+
+        return True, data[0]
+
+    def _generateSessionToken(self):
         return secrets.token_hex(8) # 16 character random string, ref: https://stackoverflow.com/a/50842164
 
-
-    def add_device(self, user_id, device_name):
-        cur = self.connection.cursor()
-        device = cur.execute('''
-            INSERT INTO devices(ownerId,name)
-            VALUES (?,?)
-        ''', [user_id, device_name]).fetchone()
-
-        cur.close()
-        self.connection.commit()
-        return True, device[0]
-
-    # FIXME: Test this
-    def add_data(self, user_id, device_id, data = None): # Ommiting data 
-        cur = self.connection.cursor()
-
-        # TODO Actually add data.
-        data = cur.execute('''
-            INSERT INTO data(deviceId)
-        ''', [device_id]).fetchone()
-
-        cur.execute('''
-            INSERT INTO pax_counts(userId,deviceId,dataId)
-            VALUES (?,?,?)
-        ''', [user_id, device_id, data[0]])
-
-    def send_http_response_and_close_connection(self, client_socket: socket.socket, response_body: str, response_status = 200, response_status_text = "OK"):
-        response_headers = {
-            'Content-Type': 'text/html; encoding=utf8',
-            'Content-Length': len(response_body),
-            'Connection': 'close',
-        }
-
-        response_proto = "HTTP/1.1"
-        client_socket.send(f"{response_proto} {response_status} {response_status_text}")
-        client_socket.send("".join(f"{key}: {value}\n" for key, value in response_headers.items()))
-        client_socket.send(response_body)
-
-        client_socket.close()
-
-    def try_validate_session(self, user_id, session_token):
-        cur = self.connection.cursor()
-        
-        result = cur.execute('''
-            SELECT sessionExpiry from users WHERE ID = (?) AND sessionToken = (?)
-        ''', [user_id, session_token]).fetchone()
-
-        if result:
-            expiryTime = datetime.datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
-            if expiryTime < datetime.datetime.now():
-                self.clearSession(user_id)
-                return False, None
-            
-            cur.execute('''
-                UPDATE users
-                SET sessionExpiry = (?)
-                WHERE ID = (?)
-            ''', [datetime.datetime.now() + datetime.timedelta(days=7), user_id])
-            cur.close()
-            self.connection.commit()
-            return True, session_token
-
-        self.clearSession(user_id)
-        return False, None
-
-    def clearSession(self, user_id):
-        cur = self.connection.cursor()
-        cur.execute('''
+    def _clearSession(self, cursor, user_id):
+        cursor.execute('''
             UPDATE users 
             SET sessionToken = NULL AND sessionExpiry = NULL
             WHERE ID = (?)
         ''', [user_id])
-        cur.close()
-        self.connection.commit()
 
-    def delete_device(self, parameter_list):
-        pass
+    def verify_active_session(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"user_id", "token"}, args)
+        result = cursor.execute('''
+            SELECT sessionExpiry from users WHERE ID = (?) AND sessionToken = (?)
+        ''', [args["user_id"], args["token"]]).fetchone()
 
-    def verify_device(self, parameter_list):
-        pass
+        if result:
+            expiryTime = datetime.datetime.strptime(result[0], "%Y-%m-%d %H:%M:%S.%f")
+            if expiryTime < datetime.datetime.now():
+                self._clearSession(cursor, args["user_id"])
+                return False, None
+            
+            cursor.execute('''
+                UPDATE users
+                SET sessionExpiry = (?)
+                WHERE ID = (?)
+            ''', [datetime.datetime.now() + datetime.timedelta(days=7), args["user_id"]])
+            return True, args["token"]
 
-    # Handle returns output in the following format:
-    #  - Sucessfully handled Request: True / False
-    #  - Data that should be returned: obj
-    def handle(self, input:dict):
-        # TODO Currently a user could send requests without the right body.
-        # Sanitize the input dict, and check if it has the necessary keys.
-
-        if (input["type"] == types.TYPE_REGISTER_USER):
-            return self.create_new_user(input["email"], input["password"], input["salt"])
-        elif (input["type"] == types.TYPE_GET_SALT):
-            return self.salt(input["email"])
-        elif (input["type"] == types.TYPE_LOGIN_USER):
-            return self.login(input["email"], input["password"])
-        elif (input["type"] == types.TYPE_VALIDATE_SESSION):
-            return self.try_validate_session(input["user_id"], input["token"])
-        elif (input["type"] == types.TYPE_ADD_DEVICE):
-            if (self.try_validate_session(input["user_id"], input["token"])[0]):
-                # Set X and Y in web interface, TODO: Create endpoint for moving
-                return self.add_device(input["user_id"], input["device"]["name"])
-        elif (input["type"] == types.TYPE_ADD_DEVICE_DATA):
-            if (self.try_validate_session(input["user_id"], input["token"])[0]):
-                return self.add_data(input["user_id"], input["device"]["token"], input["data"])
-        elif (input["type"] == types.TYPE_DELETE_DEVICE):
-            if (self.try_validate_session(input["user_id"], input["token"])[0]):
-                return self.delete_device(input["device"]["token"])
-        elif (input["type"] == types.TYPE_VERIFY_DEVICE):
-            if (self.try_validate_session(input["user_id"], input["input"])[0]):
-                return self.verify_device(...)
-
+        self._clearSession(cursor, args["user_id"])
         return False, None
 
+# TODO: Implement API Endpoints
+class DeviceHelper:
+    def add(self, cursosor, mapId, title):
+        """
+        Adds a new device to the table, owned by the map specified in the mapId, with the given title.
+        """
+        pass
 
-# db = Database("Main")
+    def remove(self, mapId, token):
+        """
+        Removes a device by it's token if a map with the specified Id owns it.
+        """
+        pass
 
-# fThread = FetchThread(Database("Main"))
+    def get_salt(self, mapId, title):
+        """
+        Returns salt of the device with the given title if the map with the given Id owns it.
+        """
+        pass
+
+    def get(self, mapId, token):
+        """
+        Returns the id of the device that has the specified token and is owned by the given map.
+        """
+        pass
+
+    def move(self, mapId, X_coordinate, Y_coordinate):
+        """
+        Moves a device to the specified x and y coordinated on the given map.
+        """
+        pass
+
+# TODO: Implement API Endpoints
+class Map:
+    def add(self, ownerId, title, img = None):
+        """
+        Adds a map with the specified owned by a user, can optionally receive an img to display in the webinterface
+        """
+        pass
+
+    def addImg(self, ownerId, mapId, img):
+        """
+        Adds an img to an existing map, owned by a user.
+        """
+        pass
+
+    def remove(self, ownerId, mapId):
+        """
+        Deletes a map
+        """
+        pass
+
+# TODO: Implement API Endpoints
+class Data:
+    def add(self, device_token, density):
+        """
+        Adds a new data point to the list.
+        """
+        pass
+
+    def get_all_data(self, device_token):
+        """
+        Returns all data points for a specific device.
+        """
+        pass
+
 fThread = FetchThread()
 fThread.run()
