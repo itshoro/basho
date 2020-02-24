@@ -19,7 +19,7 @@ class FetchThread():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print(f"Starting FetchThread with db: {self.database.name}")
             s.bind(("127.0.0.1", 50007)) # TODO: Resolve via DNS
-            s.listen(1) # Only listen to one Connection at a time.
+            s.listen(5) # Only listen to one Connection at a time.
 
             # TODO Add timeout
             # Listen forever
@@ -54,6 +54,8 @@ class Database():
         self.connection = sqlite3.connect("auth_users.db")
 
         self.user = UserHelper()
+        self.device = DeviceHelper()
+        self.data = DataHelper()
 
         print("Connected successfully to the database.")
         self.setupDatabase()
@@ -72,46 +74,15 @@ class Database():
             )
         ''')
         self.executeSql('''
-            CREATE TABLE IF NOT EXISTS data(
-                ID INTEGER PRIMARY KEY AUTOINCREMENT
-                deviceId INTEGER NOT NULL,
-
-                density INTEGER NOT NULL,
-
-                FOREIGN KEY (device_id) REFERENCES device(ID)
-            )
-        ''')
-        self.executeSql('''
             CREATE TABLE IF NOT EXISTS devices(
                 ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                token TEXT NOT NULL,
                 ownerId Integer NOT NULL,
-                name TEXT,
+                title TEXT NOT NULL,
+
+                density INT,
+                timestamp DATETIME,
                 
-                X_coordinate INTEGER,
-                Y_coordinate INTEGER,
-
                 FOREIGN KEY (ownerId) REFERENCES users(ID)
-            )
-        ''')
-        self.executeSql('''
-            CREATE TABLE IF NOT EXISTS map(
-                ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                title NAME NOT NULL,
-                mapImage BLOB
-            )
-        ''')
-        self.executeSql('''
-            CREATE TABLE IF NOT EXISTS map_data(
-                ID INTEGER PRIMARY KEY AUTOINCREMENT,
-                dataId INTEGER NOT NULL,
-                mapId INTEGER NOT NULL,
-
-                time_stamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-                FOREIGN KEY (dataId) REFERENCES data(ID),
-                FOREIGN KEY (deviceId) REFERENCES device(ID),
-                FOREIGN KEY (mapId) REFERENCES map(ID)
             )
         ''')
 
@@ -133,19 +104,17 @@ class Database():
             if self.connection:
                 self.connection.close()
 
-    def requires_authentication(self, type):
-        if (type == types.TYPE_ADD_DEVICE):
-            return True
-        elif (type == types.TYPE_DELETE_DEVICE):
-            return True
-        elif (type == types.TYPE_MOVE_DEVICE):
-            return True
-        else:
-            return False
+    # def requires_authentication(self, type):
+    #     if (type == types.TYPE_ADD_DEVICE):
+    #         return True
+    #     elif (type == types.TYPE_DELETE_DEVICE):
+    #         return True
+    #     else:
+    #         return False
 
     def execute_function(self, type, args):
-        if self.requires_authentication(type) and "auth" not in args.keys():
-            return False
+        # if self.requires_authentication(type) and "auth" not in args.keys():
+        #     return False
         function = self.get_function_from_type(type)
         
         cursor = self.connection.cursor()
@@ -188,21 +157,20 @@ class Database():
             return self.user.verify_active_session
 
         elif type == types.TYPE_ADD_DEVICE:
-            raise NotImplementedError()
+            return self.device.add
         elif type == types.TYPE_ADD_DEVICE_DATA:
-            raise NotImplementedError()
-        elif type == types.TYPE_MOVE_DEVICE:
-            raise NotImplementedError()
-        elif type == types.TYPE_VERIFY_DEVICE:
-            raise NotImplementedError()
+            return self.data.add
+        elif type == types.TYPE_GET_DATA:
+            return self.data.get_latest_data
         else:
             raise NotImplementedError()
 
-class UserHelper:
-
+class Helper:
     def stopRequestOnInsufficientArguments(self, required_arguments: list, actual_arguments : dict, error = None):
         if set(required_arguments).issubset(set(actual_arguments.items())):
             raise error or ValueError("Insufficient Arguments.")
+
+class UserHelper(Helper):
 
     def login(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"email", "password"}, args)
@@ -298,70 +266,60 @@ class UserHelper:
         return False, None
 
 # TODO: Implement API Endpoints
-class DeviceHelper:
-    def add(self, cursosor, mapId, title):
+class DeviceHelper(Helper):
+    def add(self, cursor, **args):
         """
-        Adds a new device to the table, owned by the map specified in the mapId, with the given title.
+        Adds a new device to the table, owned by the map specified in the userId, with the given title.
         """
-        pass
+        self.stopRequestOnInsufficientArguments({"userId", "title"}, args)
 
-    def remove(self, mapId, token):
+        result = cursor.execute('''SELECT ID from devices WHERE ownerID = (?) and title = (?)''', [args["userId"], args["title"]]).fetchone()
+
+        if result: 
+            return True, result[0]
+        else:
+            # Add new device
+            cursor.execute('''
+                INSERT INTO devices(ownerID,title)
+                VALUES (?,?)
+            ''', (args["userId"], args["title"]))
+
+            rowcount = cursor.rowcount
+            id = cursor.lastrowid
+            return rowcount == 1, id
+
+    def remove(self, userId, token):
         """
         Removes a device by it's token if a map with the specified Id owns it.
         """
         pass
 
-    def get_salt(self, mapId, title):
-        """
-        Returns salt of the device with the given title if the map with the given Id owns it.
-        """
-        pass
-
-    def get(self, mapId, token):
-        """
-        Returns the id of the device that has the specified token and is owned by the given map.
-        """
-        pass
-
-    def move(self, mapId, X_coordinate, Y_coordinate):
-        """
-        Moves a device to the specified x and y coordinated on the given map.
-        """
-        pass
 
 # TODO: Implement API Endpoints
-class Map:
-    def add(self, ownerId, title, img = None):
-        """
-        Adds a map with the specified owned by a user, can optionally receive an img to display in the webinterface
-        """
-        pass
-
-    def addImg(self, ownerId, mapId, img):
-        """
-        Adds an img to an existing map, owned by a user.
-        """
-        pass
-
-    def remove(self, ownerId, mapId):
-        """
-        Deletes a map
-        """
-        pass
-
-# TODO: Implement API Endpoints
-class Data:
-    def add(self, device_token, density):
+class DataHelper(Helper):
+    def add(self, cursor, **args):
         """
         Adds a new data point to the list.
         """
-        pass
+        self.stopRequestOnInsufficientArguments({"device_token", "density"}, args)
+        cursor.execute('''
+            UPDATE devices
+            SET density = (?), timestamp = (?)
+            WHERE ID = (?)
+        ''', [args["density"], datetime.datetime.now(), args["device_token"]])
+        return True, True
 
-    def get_all_data(self, device_token):
-        """
-        Returns all data points for a specific device.
-        """
-        pass
+    # Devices need to send data in a set interval. When a device doesn't send within let's say 60 seconds,
+    # throw an error that the device is not running
+    def get_latest_data(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"id"}, args)
+        result = cursor.execute('''SELECT timestamp, density from devices WHERE ownerID = (?) and title = (?)''', [args["userId"], args["title"]]).fetchone()
+
+        # TODO Improve response (see comment above)
+        if result:
+            return True, result[1]
+        return False, None
+
 
 fThread = FetchThread()
 fThread.run()

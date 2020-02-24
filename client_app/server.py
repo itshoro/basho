@@ -39,6 +39,23 @@ class LoginHandler:
         self.forms = ["login", "register"]
 
     @cherrypy.expose
+    def receiveData(self, device):
+        jsonRequest = f'''
+            {{
+                "type": "{server_constants.TYPE_GET_DATA}",
+                "id": "{device}"
+            }}
+        '''
+        self.mediator.create()
+        try:
+            data = self.mediator.send(jsonRequest)
+            return data
+        except:
+            raise CustomHTTPError(400, server_constants.ERROR_DB_UNREACHABLE)
+        finally:
+            self.mediator.close()
+
+    @cherrypy.expose
     def index(self, error = None):
         if (len(cherrypy.request.cookie) == 2 and cherrypy.request.cookie["token"]):
             try:

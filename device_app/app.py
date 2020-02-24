@@ -3,37 +3,52 @@ import threading
 import time
 from random import randint, uniform
 
+from utils.db_mediator import Mediator
+import utils.server_constants as constants
+
 import requests
 
 class DeviceEmulator:
-    def __init__(self, deviceTokens = [], amount = 4):
-        if amount < 0: raise ValueError("Must be positive integer")
+    def __init__(self, deviceNames = []):
         self.deviceThreads = []
-        
 
-        if len(deviceTokens) > 0:
-            for deviceToken in deviceTokens:
-                self.deviceThreads.append(DeviceEmulationThread(deviceToken))
-
-        for i in range(amount):
-            self.deviceThreads.append(DeviceEmulationThread())
+        if len(deviceNames) > 0:
+            for name in deviceNames:
+                self.deviceThreads.append(DeviceEmulationThread(1, name)) # Emulate for base user.
 
     def startAndJoinAfterXSeconds(self, seconds = 10):
         for thread in self.deviceThreads:
             thread.start()
             thread.join()
 
-            time.sleep(seconds)
+        time.sleep(seconds)
+        for thread in self.deviceThreads:
             thread.running = False
 
 class DeviceEmulationThread(threading.Thread):
-    def __init__(self, token = None):
+    def __init__(self, user, name):
         threading.Thread.__init__(self)
-        if token == None:
-            # TODO: Get new token from REST.
-            raise NotImplementedError()
-        self.device = Device(token)
-        self.running = True
+        self.mediator = Mediator()
+
+        self.mediator.create()
+        try:
+            jsonRequest = f'''
+            {{
+                "type": "{constants.TYPE_ADD_DEVICE}",
+                "userId": "1",
+                "title": "{name}"
+            }}
+            '''
+            token = self.mediator.send(jsonRequest)
+            print(f"Device({name}) has received the token: {token}")
+            self.device = Device(token)
+            self.running = True
+        except:
+            print(f"Device({name}) is unable to receive a token.")
+            self.running = False
+        finally:
+            self.mediator.close()
+
 
     def run(self):
         while (self.running):
@@ -41,18 +56,33 @@ class DeviceEmulationThread(threading.Thread):
             time.sleep(uniform(0.6, 3.6))
 
 class Device:
-    def __init__(self, token = None):
+    def __init__(self, name, token = None):
         self.url = ("127.0.0.1", 8080)
         self.token = token
+        self.name = name
 
-    # TODO use mediatior to GET REST.
-    def verify(self):
-        data = {
-            "token": self.token
-        }
-        r = requests.get(self.url, data=data)
-        return r.status_code == 200
+        self.mediator = Mediator()
 
-    # TODO use mediatior to post to REST.
     def sendData(self, data):
-        requests.post(self.url, data=data)
+        self.mediator.create()
+        try:
+            jsonRequest = f'''
+            {{
+                "type": "{constants.TYPE_ADD_DEVICE_DATA}",
+                "device_token": "{self.token}",
+                "density": "{data}"
+            }}
+            '''
+            self.mediator.send(jsonRequest)
+        except:
+            print(f"Device({self.name}) is unable to send {data}")
+        finally:
+            self.mediator.close()
+
+de = DeviceEmulator([
+    "pede",
+    "mariu",
+    "timmeh"
+])
+
+de.startAndJoinAfterXSeconds()

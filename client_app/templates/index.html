@@ -7,9 +7,27 @@
     <title>Document</title>
 
     <link rel="stylesheet" href="style/style.css">
+    <script src="scripts/main.js"></script>
+    <script>
+        window.addEventListener("load", () => {
+            console.log("Test");
+            receiveDeviceData(1, document.getElementById("test"));
+        });
+    </script>
 </head>
 <body>
+
     <div class="wrapper">
+        <div id="test">
+            <h1>Device #1</h1>
+        </div>
+        <div>
+            <h1>Device #2</h1>
+        </div>
+    </div>
+
+
+    <!-- <div class="wrapper">
         <div class="nav_wrapper">
             <nav>
                 <a href="/" class="logo">
@@ -32,17 +50,17 @@
         <main>
             <h1>Heatmap</h1>
             <section>
-                <!-- Filters? -->
+                <!-- Filters? --><!--
             </section>
 
             <div class="heatmap_wrapper">
-                <!-- Heatmap Visualisation -->
+                <!-- Heatmap Visualisation --><!--
                 <div class="error">
                     <h1>Oops.</h1>
                     <h3>It seems that we can't reach our application servers.</h3>
                 </div>
             </div>
         </main>
-    </div>
+    </div> -->
 </body>
 </html>

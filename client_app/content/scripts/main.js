@@ -109,3 +109,26 @@ function toggleForm() {
         console.log(obj.responseText);
     })
 }
+
+function createDeviceDataNode(deviceName, value, error = false) {
+    let container = document.createElement("p");
+    container.textContent = `Device ${deviceName}: ${value}`;
+
+    if (error) {
+        container.textContent = `Device currently unavailable.`;
+        container.style.color = "red";
+    }
+    return container;
+}
+function receiveDeviceData(deviceId, parent) {
+    let node;
+    createPostHttpRequest("receiveData", `device=${deviceId}`, (obj) => {
+        node = createDeviceDataNode(deviceId, obj.responseText);
+        parent.appendChild(node);
+        return;
+    }, (obj) => {
+        node = createDeviceDataNode(deviceId, 1, false);
+        parent.appendChild(node);
+        return;
+    });
+}
