@@ -6,9 +6,16 @@ Steps to reproduce:
 
 -> Cookies **should** be cleared in this case.
 
+### Add Time Out
 
-### Device Emulation runs infinitely.
+### Device Emulation runs infinitely. (fixed)
 
-### GET_DATA doesn't work yet.
+### GET_DATA doesn't work yet. (fixed)
 
-### Implement automatic updating in the website.
+### Implement automatic updating in the website. (added)
+
+
+### When multiple requests hit the DB it breaks. (fixed)
+Steps to reproduce:
+- Open Webserver
+- Create Breakpoint in db_handler after you recv bin data

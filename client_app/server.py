@@ -34,9 +34,26 @@ class CustomHTTPError(cherrypy.HTTPError):
 class LoginHandler:
     def __init__(self):
         self.view = TemplateHandler(os.path.join(sys.path[0], "templates"))
-        self.mediator = Mediator()
         self.formState = 0 # 0 = Login, 1 = Register
         self.forms = ["login", "register"]
+
+    @cherrypy.expose
+    def getDevices(self, owner):
+        jsonRequest = f'''
+            {{
+                "type": "{server_constants.TYPE_GET_DEVICES}",
+                "owner": "{owner}"
+            }}
+        '''
+        mediator = Mediator()
+        mediator.create()
+        try:
+            data = mediator.send(jsonRequest)
+            return data
+        except:
+            raise CustomHTTPError(400, server_constants.ERROR_DB_UNREACHABLE)
+        finally:
+            mediator.close()
 
     @cherrypy.expose
     def receiveData(self, device):
@@ -46,14 +63,15 @@ class LoginHandler:
                 "id": "{device}"
             }}
         '''
-        self.mediator.create()
+        mediator = Mediator()
+        mediator.create()
         try:
-            data = self.mediator.send(jsonRequest)
+            data = mediator.send(jsonRequest)
             return data
         except:
             raise CustomHTTPError(400, server_constants.ERROR_DB_UNREACHABLE)
         finally:
-            self.mediator.close()
+            mediator.close()
 
     @cherrypy.expose
     def index(self, error = None):
@@ -82,13 +100,14 @@ class LoginHandler:
                 "salt": "{salt}"
             }}
         '''
-        self.mediator.create()
+        mediator = Mediator()
+        mediator.create()
         try:
-            id = self.mediator.send(jsonRequest)
+            id = mediator.send(jsonRequest)
         except:
             raise CustomHTTPError(400, server_constants.ERROR_USER_ALREADY_EXISTS)
         finally:
-            self.mediator.close()
+            mediator.close()
 
     def redirectToHome(self):
         return self.view.create_view("index", None, None)
@@ -121,15 +140,16 @@ class LoginHandler:
                 "user_id": "{cherrypy.request.cookie["user_id"].value}"
             }}
         '''
-        self.mediator.create()
+        mediator = Mediator()
+        mediator.create()
         try:
-            self.mediator.send(jsonRequest)
+            mediator.send(jsonRequest)
             return self.redirectToHome()
         except:
             self.clearCookies()
             return self.index(CustomHTTPError(403, server_constants.ERROR_SESSION_EXPIRED))
         finally:
-            self.mediator.close()
+            mediator.close()
 
     @cherrypy.expose
     def toggleForm(self, formState):
@@ -146,9 +166,10 @@ class LoginHandler:
                 "password": "{password}"
             }}
         '''
-        self.mediator.create()
+        mediator = Mediator()
+        mediator.create()
         try:
-            data = self.mediator.send(jsonRequest).replace("'", "\"")
+            data = mediator.send(jsonRequest).replace("'", "\"")
             responseData = json.loads(data)
 
             cherrypy.response.cookie["token"] = responseData["token"]
@@ -159,7 +180,7 @@ class LoginHandler:
             # the email or the password is wrong here
             raise CustomHTTPError(403, server_constants.ERROR_LOGIN_OR_PASSWORD_WRONG)
         finally:
-            self.mediator.close()
+            mediator.close()
 
     @cherrypy.expose
     def login(self, email, password):
@@ -170,14 +191,15 @@ class LoginHandler:
                 "email": "{email}"
             }}
         '''
-        self.mediator.create()
+        mediator = Mediator()
+        mediator.create()
         try:
             # Salt is found, user exists.
             # Create hashed password and try to login.
-            salt = self.mediator.send(jsonRequest)
+            salt = mediator.send(jsonRequest)
             hashedPassword = self.createSaltedPassword(password, salt)
         except InterruptedError:
-            self.mediator.close()
+            mediator.close()
             # Salt wasn't found, the user entered an invalid Email.
             # Consider to instead notify with server_constants.ERROR_LOGIN_OR_PASSWORD_WRONG
             raise CustomHTTPError(400, server_constants.ERROR_USER_DOES_NOT_EXIST)

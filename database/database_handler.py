@@ -19,20 +19,30 @@ class FetchThread():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print(f"Starting FetchThread with db: {self.database.name}")
             s.bind(("127.0.0.1", 50007)) # TODO: Resolve via DNS
-            s.listen(5) # Only listen to one Connection at a time.
+            s.listen() # Only listen to one Connection at a time.
 
             # TODO Add timeout
             # Listen forever
             while True:
                 client_connection, client_address = s.accept()
                 with client_connection:
+                    if client_connection._closed:
+                        continue
+
                     print(f"New connection by {client_address}")
                     data = client_connection.recv(32768) # Max. 4Kbites of data
-                    if not data:
+                    if not data or data == b'\x0A':
                         client_connection.close()
 
                     decoded = data.decode("utf-8")
-                    received = json.loads(decoded)
+                    try:
+                        received = json.loads(decoded)
+                    except:
+                        # Sometimes filtering doesn't work so this is a safe guard, that we still parse data.
+                        print("Connection is cut due to malformed input.")
+                        client_connection.close()
+                        continue
+
                     result = self.database.execute_function(received["type"], received)
                     if(result[0]):
                         print(f"Sucessfully handled the following input: {decoded}")
@@ -158,6 +168,9 @@ class Database():
 
         elif type == types.TYPE_ADD_DEVICE:
             return self.device.add
+        elif type == types.TYPE_GET_DEVICES:
+            return self.device.get_all
+
         elif type == types.TYPE_ADD_DEVICE_DATA:
             return self.data.add
         elif type == types.TYPE_GET_DATA:
@@ -273,7 +286,7 @@ class DeviceHelper(Helper):
         """
         self.stopRequestOnInsufficientArguments({"userId", "title"}, args)
 
-        result = cursor.execute('''SELECT ID from devices WHERE ownerID = (?) and title = (?)''', [args["userId"], args["title"]]).fetchone()
+        result = cursor.execute('''SELECT ID from devices WHERE ownerId = (?) and title = (?)''', [args["userId"], args["title"]]).fetchone()
 
         if result: 
             return True, result[0]
@@ -287,6 +300,21 @@ class DeviceHelper(Helper):
             rowcount = cursor.rowcount
             id = cursor.lastrowid
             return rowcount == 1, id
+
+    def get_all(self, cursor, **args):
+        self.stopRequestOnInsufficientArguments({"owner"}, args)
+
+        result = cursor.execute('''SELECT * FROM devices WHERE ownerId=(?)''', [args["owner"]]).fetchall()
+
+        devices = []
+        for device in result:
+            devices.append({
+                "token": device[0],
+                "title": device[2],
+                "density": device[3],
+                "timestamp": device[4]
+            })
+        return True, json.dumps(devices, skipkeys=True)
 
     def remove(self, userId, token):
         """
@@ -313,11 +341,14 @@ class DataHelper(Helper):
     # throw an error that the device is not running
     def get_latest_data(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"id"}, args)
-        result = cursor.execute('''SELECT timestamp, density from devices WHERE ownerID = (?) and title = (?)''', [args["userId"], args["title"]]).fetchone()
+        result = cursor.execute('''SELECT * from devices WHERE ID = (?)''', [args["id"]]).fetchone()
 
-        # TODO Improve response (see comment above)
         if result:
-            return True, result[1]
+            device = {
+                "density": result[3],
+                "timestamp": result[4]
+            }
+            return True, json.dumps(device, skipkeys=True)
         return False, None
 
 
