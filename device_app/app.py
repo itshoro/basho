@@ -19,11 +19,11 @@ class DeviceEmulator:
     def startAndJoinAfterXSeconds(self, seconds = 10):
         for thread in self.deviceThreads:
             thread.start()
-            thread.join()
 
         time.sleep(seconds)
         for thread in self.deviceThreads:
             thread.running = False
+            thread.join()
 
 class DeviceEmulationThread(threading.Thread):
     def __init__(self, user, name):
@@ -41,7 +41,8 @@ class DeviceEmulationThread(threading.Thread):
             '''
             token = self.mediator.send(jsonRequest)
             print(f"Device({name}) has received the token: {token}")
-            self.device = Device(token)
+
+            self.device = Device(name, token)
             self.running = True
         except:
             print(f"Device({name}) is unable to receive a token.")
@@ -56,7 +57,7 @@ class DeviceEmulationThread(threading.Thread):
             time.sleep(uniform(0.6, 3.6))
 
 class Device:
-    def __init__(self, name, token = None):
+    def __init__(self, name, token):
         self.url = ("127.0.0.1", 8080)
         self.token = token
         self.name = name
@@ -73,6 +74,7 @@ class Device:
                 "density": "{data}"
             }}
             '''
+            print(f"{self.name}({self.token}) sends {data}")
             self.mediator.send(jsonRequest)
         except:
             print(f"Device({self.name}) is unable to send {data}")
@@ -84,5 +86,4 @@ de = DeviceEmulator([
     "mariu",
     "timmeh"
 ])
-
 de.startAndJoinAfterXSeconds()

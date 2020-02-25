@@ -6,6 +6,14 @@
     "configurations": [
 
         {
+            "name": "Python: Device Emulation",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}\\device_app\\app.py",
+            "cwd": "${workspaceFolder}\\device_app",
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Python: Database Handler",
             "type": "python",
             "request": "launch",
