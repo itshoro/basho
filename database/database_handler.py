@@ -10,9 +10,7 @@ import datetime
 import utils.server_constants as types
 
 class FetchThread():
-    # def __init__(self, db):
     def __init__(self):
-        # threading.Thread.__init__(self)
         self.database = Database("Main")
 
     def run(self):
@@ -116,19 +114,12 @@ class Database():
             if self.connection:
                 self.connection.close()
 
-    # def requires_authentication(self, type):
-    #     if (type == types.TYPE_ADD_DEVICE):
-    #         return True
-    #     elif (type == types.TYPE_DELETE_DEVICE):
-    #         return True
-    #     else:
-    #         return False
-
     def execute_function(self, type, args):
-        # if self.requires_authentication(type) and "auth" not in args.keys():
-        #     return False
-        function = self.get_function_from_type(type)
-        
+        try:
+            function = self.get_function_from_type(type)
+        except NotImplementedError:
+            return False, None # Type not supported
+
         cursor = self.connection.cursor()
         try:
             result = function(cursor, **args)
@@ -280,7 +271,6 @@ class UserHelper(Helper):
         self._clearSession(cursor, args["user_id"])
         return False, None
 
-# TODO: Implement API Endpoints
 class DeviceHelper(Helper):
     def add(self, cursor, **args):
         """
@@ -308,24 +298,21 @@ class DeviceHelper(Helper):
 
         result = cursor.execute('''SELECT * FROM devices WHERE ownerId=(?)''', [args["owner"]]).fetchall()
 
+        timedelta = datetime.datetime.now() - datetime.timedelta(seconds=10) # devices are inactive after not sending data for 10 seconds
         devices = []
         for device in result:
+            lastActivity = datetime.datetime.strptime(device[4], "%Y-%m-%d %H:%M:%S.%f")
+            active = timedelta <= lastActivity
+
             devices.append({
                 "token": device[0],
                 "title": device[2],
                 "density": device[3],
+                "active": active,
                 "timestamp": device[4]
             })
         return True, json.dumps(devices, skipkeys=True)
 
-    def remove(self, userId, token):
-        """
-        Removes a device by it's token if a map with the specified Id owns it.
-        """
-        pass
-
-
-# TODO: Implement API Endpoints
 class DataHelper(Helper):
     def add(self, cursor, **args):
         """
@@ -339,8 +326,6 @@ class DataHelper(Helper):
         ''', [args["density"], datetime.datetime.now(), args["device_token"]])
         return True, True
 
-    # Devices need to send data in a set interval. When a device doesn't send within let's say 60 seconds,
-    # throw an error that the device is not running
     def get_latest_data(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"id"}, args)
         result = cursor.execute('''SELECT * from devices WHERE ID = (?)''', [args["id"]]).fetchone()

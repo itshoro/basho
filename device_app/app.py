@@ -113,13 +113,13 @@ de = DeviceEmulator([
     "mariu",
     "timmeh"
 ],
-"block"
+# "block"
 )
-# de.startAndJoinAfterXSeconds()
+de.startAndJoinAfterXSeconds()
 # de.blockDatabase()
 
 
-m = Mediator()
-m.create()
-time.sleep(1)
-m.close()
+# m = Mediator()
+# m.create()
+# time.sleep(1)
+# m.close()
