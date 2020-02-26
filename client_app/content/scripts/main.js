@@ -86,7 +86,7 @@ function createError(msg) {
     closeSpan.addEventListener("click", removeError);
     error.appendChild(closeSpan);
 
-    let wrapper = document.querySelector(".login:not(.hide)");
+    let wrapper = document.querySelector(".login:not(.hide)") || document.body;
     wrapper.insertBefore(error, wrapper.children[1]);
     showsError = true;
 }
