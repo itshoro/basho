@@ -19,26 +19,32 @@ class FetchThread():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print(f"Starting FetchThread with db: {self.database.name}")
             s.bind(("127.0.0.1", 50007)) # TODO: Resolve via DNS
-            s.listen() # Only listen to one Connection at a time.
+            s.listen() 
 
-            # TODO Add timeout
             # Listen forever
             while True:
                 client_connection, client_address = s.accept()
+                client_connection.settimeout(3) # 3 second timeout
                 with client_connection:
-                    if client_connection._closed:
+                    print(f"New connection by {client_address}")
+
+                    try:
+                        data = client_connection.recv(32768) # Max. 4Kbites of data
+                    except socket.timeout:
+                        print(f"Client timed out during sending.")
+                        client_connection.close()
                         continue
 
-                    print(f"New connection by {client_address}")
-                    data = client_connection.recv(32768) # Max. 4Kbites of data
-                    if not data or data == b'\x0A':
+                    if not data.strip() or client_connection._closed:
+                        print("Client closed connection during sending.")
                         client_connection.close()
+                        continue
 
                     decoded = data.decode("utf-8")
                     try:
                         received = json.loads(decoded)
                     except:
-                        # Sometimes filtering doesn't work so this is a safe guard, that we still parse data.
+                        # Sometimes filtering doesn't work so this is a safe guard, so that the db handler doesn't break during parsing.
                         print("Connection is cut due to malformed input.")
                         client_connection.close()
                         continue
@@ -54,10 +60,6 @@ class FetchThread():
                     print(f"Closing connection for {client_connection}")
                     client_connection.close()
 
-
-
-# Currently any of the ...Helper classes pose a potential security risk and could be made more secure, by
-# instead of requiring the ownerId / mapId, we would require the users sessionToken
 class Database():
     def __init__(self, name):
         self.name = name

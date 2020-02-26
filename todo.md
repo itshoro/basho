@@ -6,14 +6,13 @@ Steps to reproduce:
 
 -> Cookies **should** be cleared in this case.
 
-### Add Time Out
+### Add Time Out (added)
 
 ### Device Emulation runs infinitely. (fixed)
 
 ### GET_DATA doesn't work yet. (fixed)
 
 ### Implement automatic updating in the website. (added)
-
 
 ### When multiple requests hit the DB it breaks. (fixed)
 Steps to reproduce:
