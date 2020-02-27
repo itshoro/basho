@@ -1,5 +1,5 @@
 let queryDensityDataTime = 2000; // 2 Seconds
-let queryDevicesDelta = 15000; // 5 Seconds
+let queryDevicesDelta = 15000; // 15 Seconds
 
 window.addEventListener("load", () => {
     setInterval(() => {
@@ -9,23 +9,24 @@ window.addEventListener("load", () => {
 });
 
 
-let devices;
+let devices = [];
 function getDevices() {
     createPostHttpRequest("getDevices", `owner=${getCookie("user_id")}`, (obj) => {
         if (showsError)
             removeError();
             
-        let newDevices = JSON.parse(obj.responseText);
+        let latestDevices = JSON.parse(obj.responseText);
+        if (latestDevices.length == 0) return;
 
-        if (devices) {
-            let filtered = newDevices.filter(val => val in devices.map(dev => dev["token"]));
-            buildDevices(filtered);
-        }
-        else {
-            buildDevices(newDevices);
-        }
+        // Only build devices we don't have in our list yet.
+        newDevices = latestDevices.filter((val) => {
+            let token = val["token"];
+            let activeTokens = devices.map(dev => dev["token"]);
+            return activeTokens.indexOf(token) == -1;
+        });
+        buildDevices(newDevices);
+        devices = latestDevices;
 
-        devices = newDevices;
         listenForDevices(devices);
     }, (obj) => {
         createError("Database is unreachable. Retrying..")
@@ -80,7 +81,7 @@ function readableDate(date) {
 
 let intervals = [];
 function listenForDevices(devs) {
-    // Clear intervals
+    // Clear intervals (If I add support to remove devices, this is necesarry.)
     while(intervals.length > 0) {
         let i = intervals.pop()
         console.log("(Info) Clearing interval with id " + i);
