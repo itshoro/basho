@@ -92,13 +92,16 @@ function createError(msg) {
 }
 
 function removeError(){
-    error.remove();
+    if (showsError) {
+        error.remove();
+    }
     showsError = false;
 }
 
 let formParent;
 let formState = 0;
 function toggleForm() {
+    removeError();
     for (child of formParent.children) {
         child.remove()
     }
