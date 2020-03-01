@@ -2,6 +2,7 @@ import sqlite3
 import threading
 import socket
 import secrets
+import mysql.connector as mariadb
 
 import json
 
@@ -16,7 +17,7 @@ class FetchThread():
     def run(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print(f"Starting FetchThread with db: {self.database.name}")
-            s.bind(("127.0.0.1", 50007)) # TODO: Resolve via DNS
+            s.bind(("0.0.0.0", 50007)) # TODO: Resolve via DNS
             s.listen() 
 
             # Listen forever
@@ -48,6 +49,7 @@ class FetchThread():
                         continue
 
                     result = self.database.execute_function(received["type"], received)
+
                     if(result[0]):
                         print(f"Sucessfully handled the following input: {decoded}")
                         print(f"Responding with: {result[1]}")
@@ -61,7 +63,8 @@ class FetchThread():
 class Database():
     def __init__(self, name):
         self.name = name
-        self.connection = sqlite3.connect("auth_users.db")
+        #self.connection = sqlite3.connect("auth_users.db")
+        self.connection = mariadb.connect(user='vsy', password='vsy', database='vsy')
 
         self.user = UserHelper()
         self.device = DeviceHelper()
@@ -73,25 +76,28 @@ class Database():
     def setupDatabase(self):
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS users(
-                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                id int NOT NULL AUTO_INCREMENT,
 
                 email TEXT NOT NULL,
                 password TEXT NOT NULL,
                 salt TEXT NOT NULL,
 
-                sessionToken TEXT,
-                sessionExpiry DATETIME
+                sessionToken TEXT DEFAULT NULL,
+                sessionExpiry DATETIME DEFAULT NULL,
+
+                primary key (id)
             )
         ''')
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS devices(
-                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                id int AUTO_INCREMENT,
                 ownerId Integer NOT NULL,
                 title TEXT NOT NULL,
 
                 density INT,
                 timestamp DATETIME,
-                
+
+                primary key (id),
                 FOREIGN KEY (ownerId) REFERENCES users(ID)
             )
         ''')
@@ -120,7 +126,7 @@ class Database():
         except NotImplementedError:
             return False, None # Type not supported
 
-        cursor = self.connection.cursor()
+        cursor = self.connection.cursor(buffered=True) # i think that's wrong; but i'm getting an Unread result error
         try:
             result = function(cursor, **args)
         except:
@@ -182,7 +188,7 @@ class UserHelper(Helper):
         self.stopRequestOnInsufficientArguments({"email", "password"}, args)
 
         data = cursor.execute('''
-            SELECT ID FROM users WHERE email = (?) AND password = (?)
+            SELECT ID FROM users WHERE email = (%s) AND password = (%s)
         ''', [args["email"], args["password"]]).fetchone()
         if (data == None):
             # No user with the email and password combo is found => invalid data.
@@ -193,8 +199,8 @@ class UserHelper(Helper):
         token = self._generateSessionToken()
         cursor.execute('''
             UPDATE users
-            SET sessionToken = (?), sessionExpiry = (?)
-            WHERE ID = (?)
+            SET sessionToken = (%s), sessionExpiry = (%s)
+            WHERE ID = (%s)
         ''',
         [
             token,
@@ -211,16 +217,17 @@ class UserHelper(Helper):
         self.stopRequestOnInsufficientArguments({"email", "password", "salt"}, args)
 
         rowcount = len(cursor.execute('''
-            SELECT * FROM users WHERE email = (?)
+            SELECT * FROM users WHERE email = (%s)
         ''', [args["email"]]).fetchall()) # cur.rowcount returns -1 after a SELECT, because the API does not specify a way to receive the number of rows
         print (f"Searching if user with email \"{args['email']}\" already exists.")
         print (f"Found {rowcount} entries with the specified email.")
+
         if (rowcount > 0):
             return False, None # If the email is already registered, let this fail
 
         cursor.execute('''
             INSERT INTO users(email,password,salt)
-            VALUES (?,?,?)
+            VALUES (%s,%s,%s)
         ''', (args["email"], args["password"], args["salt"]))
 
         rowcount = cursor.rowcount
@@ -229,11 +236,10 @@ class UserHelper(Helper):
 
     def get_salt(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"email"}, args)
-
         data = cursor.execute('''
-            SELECT salt FROM users WHERE email = (?)
+            SELECT salt FROM users WHERE email = (%s)
         ''', [args["email"]]).fetchone()
-        
+
         if (data == None or len(data) == 0):
             return False, None
 
@@ -246,13 +252,13 @@ class UserHelper(Helper):
         cursor.execute('''
             UPDATE users 
             SET sessionToken = NULL AND sessionExpiry = NULL
-            WHERE ID = (?)
+            WHERE ID = (%s)
         ''', [user_id])
 
     def verify_active_session(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"user_id", "token"}, args)
         result = cursor.execute('''
-            SELECT sessionExpiry from users WHERE ID = (?) AND sessionToken = (?)
+            SELECT sessionExpiry from users WHERE ID = (%s) AND sessionToken = (%s)
         ''', [args["user_id"], args["token"]]).fetchone()
 
         if result:
@@ -263,8 +269,8 @@ class UserHelper(Helper):
             
             cursor.execute('''
                 UPDATE users
-                SET sessionExpiry = (?)
-                WHERE ID = (?)
+                SET sessionExpiry = (%s)
+                WHERE ID = (%s)
             ''', [datetime.datetime.now() + datetime.timedelta(days=7), args["user_id"]])
             return True, args["token"]
 
@@ -278,7 +284,7 @@ class DeviceHelper(Helper):
         """
         self.stopRequestOnInsufficientArguments({"userId", "title"}, args)
 
-        result = cursor.execute('''SELECT ID from devices WHERE ownerId = (?) and title = (?)''', [args["userId"], args["title"]]).fetchone()
+        result = cursor.execute('''SELECT ID from devices WHERE ownerId = (%s) and title = (%s)''', [args["userId"], args["title"]]).fetchone()
 
         if result: 
             return True, result[0]
@@ -286,7 +292,7 @@ class DeviceHelper(Helper):
             # Add new device
             cursor.execute('''
                 INSERT INTO devices(ownerID,title)
-                VALUES (?,?)
+                VALUES (%s,%s)
             ''', (args["userId"], args["title"]))
 
             rowcount = cursor.rowcount
@@ -296,7 +302,7 @@ class DeviceHelper(Helper):
     def get_all(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"owner"}, args)
 
-        result = cursor.execute('''SELECT * FROM devices WHERE ownerId=(?)''', [args["owner"]]).fetchall()
+        result = cursor.execute('''SELECT * FROM devices WHERE ownerId=(%s)''', [args["owner"]]).fetchall()
 
         timedelta = datetime.datetime.now() - datetime.timedelta(seconds=10) # devices are inactive after not sending data for 10 seconds
         devices = []
@@ -321,14 +327,14 @@ class DataHelper(Helper):
         self.stopRequestOnInsufficientArguments({"device_token", "density"}, args)
         cursor.execute('''
             UPDATE devices
-            SET density = (?), timestamp = (?)
-            WHERE ID = (?)
+            SET density = (%s), timestamp = (%s)
+            WHERE ID = (%s)
         ''', [args["density"], datetime.datetime.now(), args["device_token"]])
         return True, True
 
     def get_latest_data(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"id"}, args)
-        result = cursor.execute('''SELECT * from devices WHERE ID = (?)''', [args["id"]]).fetchone()
+        result = cursor.execute('''SELECT * from devices WHERE ID = (%s)''', [args["id"]]).fetchone()
 
         if result:
             device = {
