@@ -1,9 +1,23 @@
-from socket import socket
+from socket import socket, error
 
 class Mediator:
-    def create(self, url = ("127.0.0.1", 50007)):
+    def __init__(self, urls = [("127.0.0.1", 50007)]):
+        self.validUrls = urls
+        self.connected = False
+
+    def create(self):
         self.socket = socket()
-        self.socket.connect(url)
+
+        for i in range(0, len(self.validUrls)):
+            try:
+                self.socket.connect(self.validUrls[i])
+                self.connected = True
+                break
+            except error:
+                print(f"Can't reach {self.validUrls[i]}")
+
+        if not self.connected:
+            raise error("No mediator is available")
 
     def close(self):
         self.socket.close()

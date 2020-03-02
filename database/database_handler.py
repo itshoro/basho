@@ -18,7 +18,7 @@ class FetchThread():
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print(f"Starting FetchThread with db: {self.database.name}")
             s.bind(("0.0.0.0", 50007)) # TODO: Resolve via DNS
-            s.listen() 
+            s.listen()
 
             # Listen forever
             while True:
@@ -48,6 +48,13 @@ class FetchThread():
                         client_connection.close()
                         continue
 
+                    try:
+                        self.database.connect()
+                    except:
+                        print("No hosts are online.")
+                        client_connection.close()
+                        continue
+
                     result = self.database.execute_function(received["type"], received)
 
                     if(result[0]):
@@ -62,9 +69,12 @@ class FetchThread():
 
 class Database():
     def __init__(self, name):
+        self.validHosts = [
+            ("ns1.vsy.home"),
+            ("ns2.vsy.home"),
+        ]
+
         self.name = name
-        #self.connection = sqlite3.connect("auth_users.db")
-        self.connection = mariadb.connect(user='vsy', password='vsy', database='vsy')
 
         self.user = UserHelper()
         self.device = DeviceHelper()
@@ -72,6 +82,18 @@ class Database():
 
         print("Connected successfully to the database.")
         self.setupDatabase()
+
+    def connect(self, user="vsy", password="vsy", database="vsy"):
+        for host in self.validHosts:
+            try:
+                self.connection = mariadb.connect(host=host,user=user, password=password, database=database)
+                return
+            except:
+                print (f"Can't connect to host {host}")
+        raise Exception("No valid host online.")
+
+    def close(self):
+        self.connection.close()
 
     def setupDatabase(self):
         self.executeSql('''
@@ -136,6 +158,7 @@ class Database():
 
         if result and self.connection.total_changes > 0:
             self.connection.commit()
+        self.connection.close()
         return result
 
     def get_function_from_type(self, type):
