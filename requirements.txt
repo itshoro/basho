@@ -1,6 +1,5 @@
 requests
 cherrypy
 mako
-flask
-flask_restful
+mariadb
 pylint
