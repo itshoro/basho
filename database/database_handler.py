@@ -3,6 +3,7 @@ import threading
 import socket
 import secrets
 import sqlite3
+import os
 
 import json
 
@@ -17,7 +18,8 @@ class FetchThread():
     def run(self):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             print(f"Starting FetchThread with db: {self.database.name}")
-            s.bind(("0.0.0.0", 50007)) # TODO: Resolve via DNS
+            # s.bind(("0.0.0.0", 50007)) # TODO: Resolve via DNS
+            s.bind(("127.0.0.1", 50007))
             s.listen()
 
             # Listen forever
@@ -88,10 +90,11 @@ class Database():
 
     def connect(self, user="vsy", password="vsy", database="vsy"):
         for host in self.validHosts:
-            try:
+            if os.path.isfile(host):
                 self.connection = sqlite3.connect(host)
+                print(f"Connected to {host}")
                 return
-            except:
+            else:
                 print (f"Can't connect to host {host}")
         raise Exception("No valid host online.")
 
@@ -101,29 +104,27 @@ class Database():
     def setupDatabase(self):
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS users(
-                id int NOT NULL AUTO_INCREMENT,
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
 
                 email TEXT NOT NULL,
                 password TEXT NOT NULL,
                 salt TEXT NOT NULL,
 
-                sessionToken TEXT DEFAULT NULL,
-                sessionExpiry DATETIME DEFAULT NULL,
-
-                primary key (id)
+                sessionToken TEXT,
+                sessionExpiry DATETIME
             )
         ''')
         self.executeSql('''
             CREATE TABLE IF NOT EXISTS devices(
-                id int AUTO_INCREMENT,
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
                 ownerId Integer NOT NULL,
                 title TEXT NOT NULL,
 
                 density INT,
                 timestamp DATETIME,
-
-                primary key (id),
+                
                 FOREIGN KEY (ownerId) REFERENCES users(ID)
+
             )
         ''')
 
@@ -133,6 +134,8 @@ class Database():
             cur.execute(createTableSql)
         except sqlite3.Error as e:
             print(e)
+        finally:
+            cur.close()
 
 
     def create_connection(self, db_file):
@@ -151,7 +154,7 @@ class Database():
         except NotImplementedError:
             return False, None # Type not supported
 
-        cursor = self.connection.cursor(buffered=True) # i think that's wrong; but i'm getting an Unread result error
+        cursor = self.connection.cursor() # i think that's wrong; but i'm getting an Unread result error
         try:
             result = function(cursor, **args)
         except:

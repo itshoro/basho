@@ -220,7 +220,7 @@ cherrypy.tree.mount(LoginHandler(), '/', static_config)
 # suppress traceback-info
 cherrypy.config.update({'request.show_tracebacks': False})
 # Start server
-cherrypy.server.socket_host = '0.0.0.0'
+cherrypy.server.socket_host = '127.0.0.1'
 cherrypy.server.socket_port = 8080
 cherrypy.engine.start()
 cherrypy.engine.block()
