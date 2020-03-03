@@ -2,7 +2,7 @@ import sqlite3
 import threading
 import socket
 import secrets
-import mysql.connector as mariadb
+import sqlite3
 
 import json
 
@@ -70,8 +70,8 @@ class FetchThread():
 class Database():
     def __init__(self, name):
         self.validHosts = [
-            ("ns1.vsy.home"),
-            ("ns2.vsy.home"),
+            ("primary.db"),
+            ("secondary.db"),
         ]
 
         self.name = name
@@ -81,12 +81,15 @@ class Database():
         self.data = DataHelper()
 
         print("Connected successfully to the database.")
-        self.setupDatabase()
+        for host in self.validHosts:
+            self.connection = sqlite3.connect(host)
+            self.setupDatabase()
+            self.connection.close()
 
     def connect(self, user="vsy", password="vsy", database="vsy"):
         for host in self.validHosts:
             try:
-                self.connection = mariadb.connect(host=host,user=user, password=password, database=database)
+                self.connection = sqlite3.connect(host)
                 return
             except:
                 print (f"Can't connect to host {host}")
@@ -211,7 +214,7 @@ class UserHelper(Helper):
         self.stopRequestOnInsufficientArguments({"email", "password"}, args)
 
         data = cursor.execute('''
-            SELECT ID FROM users WHERE email = (%s) AND password = (%s)
+            SELECT ID FROM users WHERE email = (?) AND password = (?)
         ''', [args["email"], args["password"]]).fetchone()
         if (data == None):
             # No user with the email and password combo is found => invalid data.
@@ -222,8 +225,8 @@ class UserHelper(Helper):
         token = self._generateSessionToken()
         cursor.execute('''
             UPDATE users
-            SET sessionToken = (%s), sessionExpiry = (%s)
-            WHERE ID = (%s)
+            SET sessionToken = (?), sessionExpiry = (?)
+            WHERE ID = (?)
         ''',
         [
             token,
@@ -240,7 +243,7 @@ class UserHelper(Helper):
         self.stopRequestOnInsufficientArguments({"email", "password", "salt"}, args)
 
         rowcount = len(cursor.execute('''
-            SELECT * FROM users WHERE email = (%s)
+            SELECT * FROM users WHERE email = (?)
         ''', [args["email"]]).fetchall()) # cur.rowcount returns -1 after a SELECT, because the API does not specify a way to receive the number of rows
         print (f"Searching if user with email \"{args['email']}\" already exists.")
         print (f"Found {rowcount} entries with the specified email.")
@@ -250,7 +253,7 @@ class UserHelper(Helper):
 
         cursor.execute('''
             INSERT INTO users(email,password,salt)
-            VALUES (%s,%s,%s)
+            VALUES (?,?,?)
         ''', (args["email"], args["password"], args["salt"]))
 
         rowcount = cursor.rowcount
@@ -260,7 +263,7 @@ class UserHelper(Helper):
     def get_salt(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"email"}, args)
         data = cursor.execute('''
-            SELECT salt FROM users WHERE email = (%s)
+            SELECT salt FROM users WHERE email = (?)
         ''', [args["email"]]).fetchone()
 
         if (data == None or len(data) == 0):
@@ -275,13 +278,13 @@ class UserHelper(Helper):
         cursor.execute('''
             UPDATE users 
             SET sessionToken = NULL AND sessionExpiry = NULL
-            WHERE ID = (%s)
+            WHERE ID = (?)
         ''', [user_id])
 
     def verify_active_session(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"user_id", "token"}, args)
         result = cursor.execute('''
-            SELECT sessionExpiry from users WHERE ID = (%s) AND sessionToken = (%s)
+            SELECT sessionExpiry from users WHERE ID = (?) AND sessionToken = (?)
         ''', [args["user_id"], args["token"]]).fetchone()
 
         if result:
@@ -292,8 +295,8 @@ class UserHelper(Helper):
             
             cursor.execute('''
                 UPDATE users
-                SET sessionExpiry = (%s)
-                WHERE ID = (%s)
+                SET sessionExpiry = (?)
+                WHERE ID = (?)
             ''', [datetime.datetime.now() + datetime.timedelta(days=7), args["user_id"]])
             return True, args["token"]
 
@@ -307,7 +310,7 @@ class DeviceHelper(Helper):
         """
         self.stopRequestOnInsufficientArguments({"userId", "title"}, args)
 
-        result = cursor.execute('''SELECT ID from devices WHERE ownerId = (%s) and title = (%s)''', [args["userId"], args["title"]]).fetchone()
+        result = cursor.execute('''SELECT ID from devices WHERE ownerId = (?) and title = (?)''', [args["userId"], args["title"]]).fetchone()
 
         if result: 
             return True, result[0]
@@ -315,7 +318,7 @@ class DeviceHelper(Helper):
             # Add new device
             cursor.execute('''
                 INSERT INTO devices(ownerID,title)
-                VALUES (%s,%s)
+                VALUES (?,?)
             ''', (args["userId"], args["title"]))
 
             rowcount = cursor.rowcount
@@ -325,7 +328,7 @@ class DeviceHelper(Helper):
     def get_all(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"owner"}, args)
 
-        result = cursor.execute('''SELECT * FROM devices WHERE ownerId=(%s)''', [args["owner"]]).fetchall()
+        result = cursor.execute('''SELECT * FROM devices WHERE ownerId=(?)''', [args["owner"]]).fetchall()
 
         timedelta = datetime.datetime.now() - datetime.timedelta(seconds=10) # devices are inactive after not sending data for 10 seconds
         devices = []
@@ -350,14 +353,14 @@ class DataHelper(Helper):
         self.stopRequestOnInsufficientArguments({"device_token", "density"}, args)
         cursor.execute('''
             UPDATE devices
-            SET density = (%s), timestamp = (%s)
-            WHERE ID = (%s)
+            SET density = (?), timestamp = (?)
+            WHERE ID = (?)
         ''', [args["density"], datetime.datetime.now(), args["device_token"]])
         return True, True
 
     def get_latest_data(self, cursor, **args):
         self.stopRequestOnInsufficientArguments({"id"}, args)
-        result = cursor.execute('''SELECT * from devices WHERE ID = (%s)''', [args["id"]]).fetchone()
+        result = cursor.execute('''SELECT * from devices WHERE ID = (?)''', [args["id"]]).fetchone()
 
         if result:
             device = {
