@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+        {"name":"Python: Current File","type":"python","request":"launch","program":"${file}","console":"integratedTerminal"},
 
         {
             "name": "Python: Device Emulation",
@@ -17,24 +18,24 @@
             "name": "Python: Database Handler",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}\\database\\database_handler.py",
-            "cwd": "${workspaceFolder}\\database",
+            "program": "${workspaceFolder}/database/database_handler.py",
+            "cwd": "${workspaceFolder}/database",
             "console": "integratedTerminal"
         },
         {
             "name": "Python: Server",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}\\client_app\\server.py",
-            "cwd": "${workspaceFolder}\\client_app",
+            "program": "${workspaceFolder}/client_app/server.py",
+            "cwd": "${workspaceFolder}/client_app",
             "console": "integratedTerminal"
         },
         {
             "name": "Python: REST API",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}\\rest_api\\app.py",
-            "cwd": "${workspaceFolder}\\rest_api",
+            "program": "${workspaceFolder}/rest_api/.py",
+            "cwd": "${workspaceFolder}/rest_api",
             "console": "integratedTerminal"
         }
     ]
