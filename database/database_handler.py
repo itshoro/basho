@@ -84,13 +84,13 @@ class Database():
         for host in self.validHosts:
             try:
                 self.connection = mariadb.connect(host=host, user="vsy", password="vsy", database="vsy")
-                self.connection.autocommit = False
-                self.setupDatabase()
-                print(f"Finished setting up {host}.")
             except:
                 print(f"Couldn't reach the database on host {host}.")
-            finally:
-                self.connection.close()
+                
+            self.connection.autocommit = False
+            self.setupDatabase()
+            print(f"Finished setting up {host}.")
+            self.connection.close()
 
     def connect(self, user="vsy", password="vsy", database="vsy"):
         for host in self.validHosts:
