@@ -1,4 +1,5 @@
 requests
 cherrypy
 mako
+mariadb
 pylint
