@@ -86,7 +86,8 @@ class Database():
                 self.connection = mariadb.connect(host=host, user="vsy", password="vsy", database="vsy")
             except:
                 print(f"Couldn't reach the database on host {host}.")
-                
+                continue
+
             self.connection.autocommit = False
             self.setupDatabase()
             print(f"Finished setting up {host}.")
