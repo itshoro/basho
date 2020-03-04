@@ -75,7 +75,7 @@ class DeviceEmulationThread(threading.Thread):
 
 class Device:
     def __init__(self, name, token):
-        self.url = ("127.0.0.1", 8080)
+        self.url = ("127.0.0.1", 80)
         self.token = token
         self.name = name
 
